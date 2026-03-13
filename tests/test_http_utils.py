@@ -1,8 +1,6 @@
 """Tests for shared HTTP utilities."""
 
-import pytest
-
-from core.http_utils import create_session, safe_get, USER_AGENT
+from core.http_utils import USER_AGENT, create_session
 
 
 class TestCreateSession:

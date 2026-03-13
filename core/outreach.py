@@ -36,13 +36,13 @@ def generate_outreach_email(lead, analysis, template_type="auto"):
             template_type = "standard"
 
     generator = generators.get(template_type, _standard_template)
-    return generator(domain, company_name, keywords, reason, value_low, value_high,
-                     selling_points, data_points)
+    return generator(domain, company_name, keywords, reason, value_low, value_high, selling_points, data_points)
 
 
 def _build_natural_reason(lead, analysis):
     """Build a natural-sounding reason for why we're reaching out."""
     import tldextract
+
     website_domain = lead.get("website_domain", "")
     ext = tldextract.extract(website_domain)
     company_domain_name = ext.domain.lower()
@@ -50,7 +50,6 @@ def _build_natural_reason(lead, analysis):
     keywords = analysis.get("keywords", [])
 
     if domain_name == company_domain_name:
-        current_tld = ext.suffix
         return f"your company currently operates under {website_domain}, and {analysis['domain']} could strengthen and consolidate your online brand"
     elif domain_name in company_domain_name:
         return f"your brand name closely aligns with {analysis['domain']} — it's a natural brand asset"
@@ -69,11 +68,12 @@ def _build_natural_reason(lead, analysis):
         if techs:
             return f"your modern tech stack ({', '.join(techs[:2])}) signals a brand that's investing in growth"
         location = lead.get("location", "")
-        if location and analysis.get("industries"):
-            ind = analysis["industries"][0].replace("_", " ")
+        industries = analysis.get("industries") or []
+        if location and industries:
+            ind = industries[0].replace("_", " ")
             return f"you're a {location}-based leader in the {ind} space"
-        if analysis.get("industries") and analysis["industries"][0] != "general":
-            ind = analysis["industries"][0].replace("_", " ")
+        if industries and industries[0] != "general":
+            ind = industries[0].replace("_", " ")
             return f"your focus on {ind} aligns perfectly with what this domain represents"
         return "your company operates in a space where this domain could drive real value"
 
@@ -95,7 +95,9 @@ def _build_selling_points(analysis, lead=None):
     social = analysis.get("social_handles", {})
     taken = social.get("taken_count", 0)
     if taken >= 5:
-        points.append(f"Brand name @{social.get('handle','')} is claimed on {taken}/7 major platforms — proven brand demand")
+        points.append(
+            f"Brand name @{social.get('handle', '')} is claimed on {taken}/7 major platforms — proven brand demand"
+        )
     elif taken >= 3:
         points.append(f"Matching social handles active on {taken} platforms — established brand identity")
 
@@ -108,7 +110,7 @@ def _build_selling_points(analysis, lead=None):
     # Brandability
     brand = analysis.get("brandability", {})
     if brand.get("score", 0) >= 70:
-        points.append(f"Brandability score: {brand['score']}/100 ({brand.get('grade','')}) — top-tier naming")
+        points.append(f"Brandability score: {brand['score']}/100 ({brand.get('grade', '')}) — top-tier naming")
 
     # Geo niche
     niche = analysis.get("niche_context", "")
@@ -233,7 +235,9 @@ Best regards""",
     }
 
 
-def _similar_domain_template(domain, company, keywords, reason, val_low, val_high, selling_points=None, data_points=None):
+def _similar_domain_template(
+    domain, company, keywords, reason, val_low, val_high, selling_points=None, data_points=None
+):
     bullets = ""
     if data_points:
         bullets = "\n".join(f"  \u2022 {p}" for p in data_points)

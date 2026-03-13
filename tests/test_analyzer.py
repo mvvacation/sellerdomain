@@ -1,9 +1,10 @@
 """Tests for domain analyzer — keyword extraction, industry mapping, valuation, brandability."""
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-from core.analyzer import DomainAnalyzer, INDUSTRY_KEYWORDS, TLD_VALUES
+import pytest
+
+from core.analyzer import DomainAnalyzer
 
 
 class TestDomainAnalyzerInit:
@@ -21,6 +22,7 @@ class TestDomainAnalyzerInit:
 
     def test_invalid_domain_raises(self):
         from core.validators import ValidationError
+
         with pytest.raises(ValidationError):
             DomainAnalyzer("not valid")
 
@@ -167,9 +169,18 @@ class TestFullAnalysis:
         a = DomainAnalyzer("healthtrack.com")
         result = a.analyze()
         required = [
-            "domain", "name", "tld", "keywords", "industries",
-            "whois", "dns", "is_registered", "domain_age_years",
-            "estimated_value_low", "estimated_value_high", "brandability",
+            "domain",
+            "name",
+            "tld",
+            "keywords",
+            "industries",
+            "whois",
+            "dns",
+            "is_registered",
+            "domain_age_years",
+            "estimated_value_low",
+            "estimated_value_high",
+            "brandability",
         ]
         for key in required:
             assert key in result, f"Missing key: {key}"

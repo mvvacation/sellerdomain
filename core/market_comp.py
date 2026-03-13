@@ -43,20 +43,24 @@ def find_comparable_sales(domain_name, tld, keywords):
                     if prices and domains:
                         for d in domains[:2]:
                             for p in prices[:2]:
-                                all_hits.append({
-                                    "domain": d,
+                                all_hits.append(
+                                    {
+                                        "domain": d,
+                                        "price": p,
+                                        "source": _extract_source(url),
+                                        "url": url,
+                                    }
+                                )
+                    elif prices and not domains:
+                        for p in prices[:1]:
+                            all_hits.append(
+                                {
+                                    "domain": _clean_title_domain(title),
                                     "price": p,
                                     "source": _extract_source(url),
                                     "url": url,
-                                })
-                    elif prices and not domains:
-                        for p in prices[:1]:
-                            all_hits.append({
-                                "domain": _clean_title_domain(title),
-                                "price": p,
-                                "source": _extract_source(url),
-                                "url": url,
-                            })
+                                }
+                            )
                 break  # success, no retry needed
             except Exception:
                 if attempt == 0:
@@ -137,14 +141,23 @@ def _extract_domains(text):
     pattern = r"\b([a-zA-Z0-9][-a-zA-Z0-9]*\.(?:com|net|org|io|co|ai|app|dev|tech|us|me))\b"
     found = re.findall(pattern, text, re.I)
     # Filter out common false positives
-    skip = {"google.com", "facebook.com", "twitter.com", "example.com",
-            "godaddy.com", "namecheap.com", "sedo.com", "dan.com"}
+    skip = {
+        "google.com",
+        "facebook.com",
+        "twitter.com",
+        "example.com",
+        "godaddy.com",
+        "namecheap.com",
+        "sedo.com",
+        "dan.com",
+    }
     return [d for d in found if d.lower() not in skip]
 
 
 def _extract_source(url):
     """Extract source name from URL."""
     import tldextract
+
     ext = tldextract.extract(url)
     return ext.domain.capitalize()
 

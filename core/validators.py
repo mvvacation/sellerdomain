@@ -5,9 +5,7 @@ import re
 import tldextract
 
 # Strict domain pattern: alphanumeric + hyphens, valid TLD
-_DOMAIN_RE = re.compile(
-    r"^(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$"
-)
+_DOMAIN_RE = re.compile(r"^(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$")
 
 # Maximum domain length per RFC
 _MAX_DOMAIN_LENGTH = 253
@@ -30,7 +28,7 @@ def validate_domain(domain: str) -> str:
     # Strip protocol if user accidentally included it
     for prefix in ("https://", "http://", "//"):
         if domain.startswith(prefix):
-            domain = domain[len(prefix):]
+            domain = domain[len(prefix) :]
 
     # Strip trailing slash / path
     domain = domain.split("/")[0]
@@ -43,9 +41,7 @@ def validate_domain(domain: str) -> str:
         raise ValidationError(f"Domain exceeds maximum length ({_MAX_DOMAIN_LENGTH} chars)")
 
     if not _DOMAIN_RE.match(domain):
-        raise ValidationError(
-            f"Invalid domain format: '{domain}'. Expected format: example.com"
-        )
+        raise ValidationError(f"Invalid domain format: '{domain}'. Expected format: example.com")
 
     # Verify it has a real TLD
     ext = tldextract.extract(domain)

@@ -1,6 +1,7 @@
 """Buyer research module v3 - robust retry, deeper search, contact discovery, enrichment."""
 
 import json as _json
+import logging
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -11,7 +12,9 @@ import tldextract
 from bs4 import BeautifulSoup
 
 from core.cache import SearchCache
-from core.http_utils import create_session, safe_get, USER_AGENT
+from core.http_utils import create_session, safe_get
+
+logger = logging.getLogger(__name__)
 
 try:
     from ddgs import DDGS
@@ -32,47 +35,144 @@ except ImportError:
 # Domains to skip — big platforms, news, government, directories, etc.
 SKIP_DOMAINS = {
     # Search engines & big tech
-    "google.com", "google.co", "youtube.com", "facebook.com", "twitter.com",
-    "x.com", "instagram.com", "linkedin.com", "pinterest.com", "reddit.com",
-    "wikipedia.org", "wikimedia.org", "amazon.com", "ebay.com", "craigslist.org",
-    "yelp.com", "bbb.org", "glassdoor.com", "indeed.com", "github.com",
-    "stackoverflow.com", "medium.com", "quora.com", "tiktok.com",
-    "apple.com", "microsoft.com", "wordpress.com", "blogspot.com",
+    "google.com",
+    "google.co",
+    "youtube.com",
+    "facebook.com",
+    "twitter.com",
+    "x.com",
+    "instagram.com",
+    "linkedin.com",
+    "pinterest.com",
+    "reddit.com",
+    "wikipedia.org",
+    "wikimedia.org",
+    "amazon.com",
+    "ebay.com",
+    "craigslist.org",
+    "yelp.com",
+    "bbb.org",
+    "glassdoor.com",
+    "indeed.com",
+    "github.com",
+    "stackoverflow.com",
+    "medium.com",
+    "quora.com",
+    "tiktok.com",
+    "apple.com",
+    "microsoft.com",
+    "wordpress.com",
+    "blogspot.com",
     # Domain marketplaces
-    "godaddy.com", "namecheap.com", "sedo.com", "dan.com", "afternic.com",
-    "hugedomains.com", "domainmarket.com", "spaceship.com",
+    "godaddy.com",
+    "namecheap.com",
+    "sedo.com",
+    "dan.com",
+    "afternic.com",
+    "hugedomains.com",
+    "domainmarket.com",
+    "spaceship.com",
     # CDN / infrastructure
-    "w3.org", "schema.org", "cloudflare.com", "gstatic.com", "googleapis.com",
-    "googletagmanager.com", "doubleclick.net", "cdn.jsdelivr.net", "unpkg.com",
+    "w3.org",
+    "schema.org",
+    "cloudflare.com",
+    "gstatic.com",
+    "googleapis.com",
+    "googletagmanager.com",
+    "doubleclick.net",
+    "cdn.jsdelivr.net",
+    "unpkg.com",
     # News / media / publications
-    "techcrunch.com", "fortune.com", "forbes.com", "bloomberg.com", "cnbc.com",
-    "reuters.com", "nytimes.com", "wsj.com", "bbc.com", "bbc.co.uk",
-    "theverge.com", "wired.com", "arstechnica.com", "cnn.com", "businessinsider.com",
-    "fastcompany.com", "inc.com", "entrepreneur.com", "venturebeat.com",
-    "zdnet.com", "mashable.com", "huffpost.com", "engadget.com",
-    "fiercehealthcare.com", "healthcaredive.com", "mobihealthnews.com",
-    "medcitynews.com", "statnews.com", "healthcareweekly.com",
-    "hitconsultant.net", "healthlawinformer.com", "healthdatapalooza.org",
-    "prnewswire.com", "businesswire.com", "pymnts.com", "capitalbrief.com",
-    "siliconprairienews.com", "thesaasnews.com", "businessden.com",
+    "techcrunch.com",
+    "fortune.com",
+    "forbes.com",
+    "bloomberg.com",
+    "cnbc.com",
+    "reuters.com",
+    "nytimes.com",
+    "wsj.com",
+    "bbc.com",
+    "bbc.co.uk",
+    "theverge.com",
+    "wired.com",
+    "arstechnica.com",
+    "cnn.com",
+    "businessinsider.com",
+    "fastcompany.com",
+    "inc.com",
+    "entrepreneur.com",
+    "venturebeat.com",
+    "zdnet.com",
+    "mashable.com",
+    "huffpost.com",
+    "engadget.com",
+    "fiercehealthcare.com",
+    "healthcaredive.com",
+    "mobihealthnews.com",
+    "medcitynews.com",
+    "statnews.com",
+    "healthcareweekly.com",
+    "hitconsultant.net",
+    "healthlawinformer.com",
+    "healthdatapalooza.org",
+    "prnewswire.com",
+    "businesswire.com",
+    "pymnts.com",
+    "capitalbrief.com",
+    "siliconprairienews.com",
+    "thesaasnews.com",
+    "businessden.com",
     "macrumors.com",
     # Investment / directory / listing sites
-    "crunchbase.com", "news.crunchbase.com", "pitchbook.com", "tracxn.com",
-    "ycombinator.com", "builtin.com", "builtinboston.com", "angellist.com",
-    "cbinsights.com", "growthlist.co", "seedtable.com", "fundraiseinsider.com",
-    "startupblink.com", "startupsavant.com", "ventureradar.com",
+    "crunchbase.com",
+    "news.crunchbase.com",
+    "pitchbook.com",
+    "tracxn.com",
+    "ycombinator.com",
+    "builtin.com",
+    "builtinboston.com",
+    "angellist.com",
+    "cbinsights.com",
+    "growthlist.co",
+    "seedtable.com",
+    "fundraiseinsider.com",
+    "startupblink.com",
+    "startupsavant.com",
+    "ventureradar.com",
     # Government & academic
-    "cdc.gov", "nih.gov", "ncbi.nlm.nih.gov", "pubmed.ncbi.nlm.nih.gov",
-    "hhs.gov", "telehealth.hhs.gov", "who.int", "gov.uk",
-    "edu", "ac.uk", "berkeley.edu",
+    "cdc.gov",
+    "nih.gov",
+    "ncbi.nlm.nih.gov",
+    "pubmed.ncbi.nlm.nih.gov",
+    "hhs.gov",
+    "telehealth.hhs.gov",
+    "who.int",
+    "gov.uk",
+    "edu",
+    "ac.uk",
+    "berkeley.edu",
     # Design / dev / aggregate sites
-    "dribbble.com", "figma.com", "devpost.com", "softonic.com",
-    "producthunt.com", "g2.com", "capterra.com", "trustpilot.com",
+    "dribbble.com",
+    "figma.com",
+    "devpost.com",
+    "softonic.com",
+    "producthunt.com",
+    "g2.com",
+    "capterra.com",
+    "trustpilot.com",
     # Big retailers / generic
-    "walmart.com", "target.com", "bestbuy.com",
+    "walmart.com",
+    "target.com",
+    "bestbuy.com",
     # Other large / irrelevant
-    "mayoclinic.org", "sxsw.com", "consumer.huawei.com", "garmin.com",
-    "myfitnesspal.com", "ouraring.com", "whoop.com", "fitbit.com",
+    "mayoclinic.org",
+    "sxsw.com",
+    "consumer.huawei.com",
+    "garmin.com",
+    "myfitnesspal.com",
+    "ouraring.com",
+    "whoop.com",
+    "fitbit.com",
 }
 
 # USER_AGENT imported from http_utils
@@ -81,10 +181,36 @@ EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
 
 # File/image extensions that look like TLDs but aren't valid emails
 _FAKE_EMAIL_TLDS = {
-    "png", "jpg", "jpeg", "gif", "svg", "webp", "bmp", "ico",
-    "css", "js", "json", "xml", "html", "htm", "pdf", "doc",
-    "zip", "tar", "gz", "mp3", "mp4", "avi", "mov", "exe",
-    "woff", "woff2", "ttf", "eot", "map", "min",
+    "png",
+    "jpg",
+    "jpeg",
+    "gif",
+    "svg",
+    "webp",
+    "bmp",
+    "ico",
+    "css",
+    "js",
+    "json",
+    "xml",
+    "html",
+    "htm",
+    "pdf",
+    "doc",
+    "zip",
+    "tar",
+    "gz",
+    "mp3",
+    "mp4",
+    "avi",
+    "mov",
+    "exe",
+    "woff",
+    "woff2",
+    "ttf",
+    "eot",
+    "map",
+    "min",
 }
 PHONE_RE = re.compile(
     r"(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}"
@@ -92,8 +218,16 @@ PHONE_RE = re.compile(
 )
 
 JUNK_EMAIL_PREFIXES = {
-    "noreply", "no-reply", "mailer-daemon", "postmaster", "webmaster",
-    "donotreply", "do-not-reply", "bounce", "daemon", "nobody",
+    "noreply",
+    "no-reply",
+    "mailer-daemon",
+    "postmaster",
+    "webmaster",
+    "donotreply",
+    "do-not-reply",
+    "bounce",
+    "daemon",
+    "nobody",
 }
 
 # Technology detection patterns (check HTML/headers)
@@ -132,6 +266,7 @@ class BuyerResearcher:
         self.progress = progress_callback or (lambda msg, **kw: None)
 
         self._session = create_session(retries=3, backoff_factor=0.5, pool_size=10)
+        self._ddgs = DDGS() if DDGS is not None else None
 
         self.cache = SearchCache(
             enabled=config.get("cache", "enabled", default=True),
@@ -382,13 +517,11 @@ class BuyerResearcher:
             # Check cache first
             cached = self.cache.get("search", f"{engine}:{query}")
             if cached is not None:
-                self.progress(f"  Query {i + 1}/{len(queries)}: {query} [cached]",
-                              step="search", current=i + 1)
+                self.progress(f"  Query {i + 1}/{len(queries)}: {query} [cached]", step="search", current=i + 1)
                 all_results.extend(cached)
                 continue
 
-            self.progress(f"  Query {i + 1}/{len(queries)}: {query}",
-                          step="search", current=i + 1)
+            self.progress(f"  Query {i + 1}/{len(queries)}: {query}", step="search", current=i + 1)
             try:
                 if engine == "serpapi":
                     results = self._search_serpapi(query, max_per_query)
@@ -416,29 +549,31 @@ class BuyerResearcher:
                 if results:
                     return results
             except Exception:
-                pass
+                logger.debug("DDGS fallback failed for query: %s", query, exc_info=True)
         if google_search is not None:
             try:
                 results = self._search_google(query, max_results)
                 if results:
                     return results
             except Exception:
-                pass
+                logger.debug("Google fallback failed for query: %s", query, exc_info=True)
         self.progress("  No search engine available.", step="search")
         return []
 
     def _search_ddgs(self, query, max_results):
-        if DDGS is None:
+        if self._ddgs is None:
             raise RuntimeError("ddgs not installed")
         results = []
         try:
-            for item in DDGS().text(query, max_results=max_results):
-                results.append({
-                    "url": item.get("href", ""),
-                    "title": item.get("title", ""),
-                    "snippet": item.get("body", ""),
-                    "query": query,
-                })
+            for item in self._ddgs.text(query, max_results=max_results):
+                results.append(
+                    {
+                        "url": item.get("href", ""),
+                        "title": item.get("title", ""),
+                        "snippet": item.get("body", ""),
+                        "query": query,
+                    }
+                )
         except Exception as e:
             self.progress(f"  DuckDuckGo error: {e}", step="search")
         return results
@@ -449,9 +584,14 @@ class BuyerResearcher:
         results = []
         try:
             for url in google_search(query, num_results=max_results):
-                results.append({
-                    "url": url, "title": "", "snippet": "", "query": query,
-                })
+                results.append(
+                    {
+                        "url": url,
+                        "title": "",
+                        "snippet": "",
+                        "query": query,
+                    }
+                )
         except Exception as e:
             self.progress(f"  Google error: {e}", step="search")
         return results
@@ -465,8 +605,12 @@ class BuyerResearcher:
         params = {"q": query, "api_key": api_key, "engine": "google", "num": max_results}
         data = SerpApiSearch(params).get_dict()
         return [
-            {"url": item.get("link", ""), "title": item.get("title", ""),
-             "snippet": item.get("snippet", ""), "query": query}
+            {
+                "url": item.get("link", ""),
+                "title": item.get("title", ""),
+                "snippet": item.get("snippet", ""),
+                "query": query,
+            }
             for item in data.get("organic_results", [])
         ]
 
@@ -545,18 +689,15 @@ class BuyerResearcher:
         if to_scrape:
             workers = min(5, len(to_scrape))
             with ThreadPoolExecutor(max_workers=workers) as executor:
-                futures = {
-                    executor.submit(self._enrich_single, company, timeout): company
-                    for company in to_scrape
-                }
-                for idx, future in enumerate(as_completed(futures)):
+                futures = {executor.submit(self._enrich_single, company, timeout): company for company in to_scrape}
+                for future in as_completed(futures):
                     company = futures[future]
                     try:
                         enrichment_data = future.result()
                         company.update(enrichment_data)
                         self.cache.set("enrich", company["website_domain"], enrichment_data)
                     except Exception:
-                        pass
+                        logger.debug("Failed to enrich %s", company.get("website_domain", "?"), exc_info=True)
                     enriched.append(company)
                     self.progress(
                         f"    {company['website_domain']}",
@@ -596,8 +737,7 @@ class BuyerResearcher:
             # --- Phone numbers ---
             phones = PHONE_RE.findall(html_text)
             if phones:
-                valid_phones = [p.strip() for p in phones
-                                if len(re.sub(r'\D', '', p)) >= 10]
+                valid_phones = [p.strip() for p in phones if len(re.sub(r"\D", "", p)) >= 10]
                 if valid_phones:
                     enrichment_data["phone"] = valid_phones[0]
 
@@ -651,8 +791,7 @@ class BuyerResearcher:
                 self._merge_emails(enrichment_data, contact_resp.text, domain_key)
                 if not enrichment_data.get("phone"):
                     contact_phones = PHONE_RE.findall(contact_resp.text)
-                    valid = [p.strip() for p in contact_phones
-                             if len(re.sub(r'\D', '', p)) >= 10]
+                    valid = [p.strip() for p in contact_phones if len(re.sub(r"\D", "", p)) >= 10]
                     if valid:
                         enrichment_data["phone"] = valid[0]
 
@@ -686,8 +825,13 @@ class BuyerResearcher:
             p = e.split("@")[0].lower()
             ed = e.split("@")[1].lower()
             tld_part = ed.rsplit(".", 1)[-1]
-            if (p not in JUNK_EMAIL_PREFIXES and tld_part not in _FAKE_EMAIL_TLDS
-                    and ".." not in ed and ed == domain_key and e not in existing):
+            if (
+                p not in JUNK_EMAIL_PREFIXES
+                and tld_part not in _FAKE_EMAIL_TLDS
+                and ".." not in ed
+                and ed == domain_key
+                and e not in existing
+            ):
                 existing.append(e)
         enrichment_data["emails"] = existing
 
@@ -710,7 +854,7 @@ class BuyerResearcher:
                     if loc:
                         return loc
             except Exception:
-                pass
+                logger.debug("Failed to parse JSON-LD for location", exc_info=True)
 
         # Schema.org itemprop
         locality = soup.find(attrs={"itemprop": "addressLocality"})
@@ -758,78 +902,91 @@ class BuyerResearcher:
         return resolver.resolve(domain, rtype)
 
     def _check_similar_domains(self):
-        """Check who owns similar domain names across TLDs."""
+        """Check who owns similar domain names across TLDs — concurrent."""
         name = self.analysis["name"]
         tld = self.analysis["tld"]
         alt_tlds = ["com", "net", "org", "io", "co", "ai", "app", "dev", "tech", "us"]
         similar = []
+        to_check = []
 
         for alt_tld in alt_tlds:
             if alt_tld == tld:
                 continue
             alt_domain = f"{name}.{alt_tld}"
-
             cached = self.cache.get("similar", alt_domain)
             if cached is not None:
-                if cached:  # non-empty means we found something
+                if cached:
                     similar.append(cached)
-                continue
+            else:
+                to_check.append(alt_domain)
 
-            try:
-                try:
-                    self._dns_resolve(alt_domain, "A")
-                except Exception:
-                    self.cache.set("similar", alt_domain, {})
-                    continue
-
-                result = {
-                    "name": self._domain_to_company_name(alt_domain),
-                    "website": f"https://{alt_domain}",
-                    "website_domain": alt_domain,
-                    "url_found": f"https://{alt_domain}",
-                    "title": "", "snippet": "",
-                    "matched_queries": [f"Similar domain: {alt_domain}"],
-                    "emails": [], "phone": "",
-                    "social": {}, "description": "",
-                    "meta_title": "", "location": "",
-                    "employee_count": "", "technologies": [],
-                    "is_similar_domain": True,
-                }
-
-                try:
-                    resp = self._session.get(f"https://{alt_domain}", timeout=5, allow_redirects=True)
-                    soup = BeautifulSoup(resp.text, "lxml")
-                    if soup.title and soup.title.string:
-                        result["title"] = soup.title.string.strip()[:200]
-                        result["meta_title"] = result["title"]
-                    meta = soup.find("meta", attrs={"name": "description"})
-                    if meta and meta.get("content"):
-                        result["description"] = meta["content"].strip()[:500]
-                        result["snippet"] = result["description"]
-
-                    final_domain = urlparse(resp.url).netloc.lower()
-                    if final_domain.startswith("www."):
-                        final_domain = final_domain[4:]
-                    result["website"] = f"https://{final_domain}"
-                    result["website_domain"] = final_domain
-
-                    if result["title"]:
-                        parts = re.split(r"\s*[\|–\-—]\s*", result["title"])
-                        if parts and 2 < len(parts[0].strip()) < 60:
-                            result["name"] = parts[0].strip()
-                except Exception:
-                    pass
-
-                similar.append(result)
-                self.cache.set("similar", alt_domain, result)
-
-            except Exception:
-                continue
+        if to_check:
+            workers = min(5, len(to_check))
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                futures = {executor.submit(self._check_single_similar, d): d for d in to_check}
+                for future in as_completed(futures):
+                    result = future.result()
+                    if result:
+                        similar.append(result)
 
         return similar
 
+    def _check_single_similar(self, alt_domain):
+        """Check a single similar domain — runs in thread pool."""
+        try:
+            self._dns_resolve(alt_domain, "A")
+        except Exception:
+            self.cache.set("similar", alt_domain, {})
+            return None
+
+        result = {
+            "name": self._domain_to_company_name(alt_domain),
+            "website": f"https://{alt_domain}",
+            "website_domain": alt_domain,
+            "url_found": f"https://{alt_domain}",
+            "title": "",
+            "snippet": "",
+            "matched_queries": [f"Similar domain: {alt_domain}"],
+            "emails": [],
+            "phone": "",
+            "social": {},
+            "description": "",
+            "meta_title": "",
+            "location": "",
+            "employee_count": "",
+            "technologies": [],
+            "is_similar_domain": True,
+        }
+
+        try:
+            resp = self._session.get(f"https://{alt_domain}", timeout=5, allow_redirects=True)
+            soup = BeautifulSoup(resp.text, "lxml")
+            if soup.title and soup.title.string:
+                result["title"] = soup.title.string.strip()[:200]
+                result["meta_title"] = result["title"]
+            meta = soup.find("meta", attrs={"name": "description"})
+            if meta and meta.get("content"):
+                result["description"] = meta["content"].strip()[:500]
+                result["snippet"] = result["description"]
+
+            final_domain = urlparse(resp.url).netloc.lower()
+            if final_domain.startswith("www."):
+                final_domain = final_domain[4:]
+            result["website"] = f"https://{final_domain}"
+            result["website_domain"] = final_domain
+
+            if result["title"]:
+                parts = re.split(r"\s*[\|–\-—]\s*", result["title"])
+                if parts and 2 < len(parts[0].strip()) < 60:
+                    result["name"] = parts[0].strip()
+        except Exception:
+            logger.debug("Failed to fetch similar domain %s", alt_domain, exc_info=True)
+
+        self.cache.set("similar", alt_domain, result)
+        return result
+
     def _check_domain_variations(self):
-        """Check branded domain variations (getX, myX, useX, etc.)."""
+        """Check branded domain variations (getX, myX, useX, etc.) — concurrent."""
         name = self.analysis["name"]
         prefixes = ["get", "my", "use", "go", "try", "the", "hey", "one", "meet", "join"]
         suffixes = ["app", "hq", "io", "now", "hub", "labs", "tech", "ai", "dev", "pro", "plus", "world"]
@@ -841,63 +998,80 @@ class BuyerResearcher:
             variations.append(f"{pfx}{name}.{check_tld}")
         for sfx in suffixes:
             variations.append(f"{name}{sfx}.{check_tld}")
-        # Hyphenated
         if len(self.keywords) >= 2:
             variations.append(f"{'-'.join(self.keywords)}.{check_tld}")
 
+        to_check = []
         for var_domain in variations:
             cached = self.cache.get("variation", var_domain)
             if cached is not None:
                 if cached:
                     results.append(cached)
-                continue
+            else:
+                to_check.append(var_domain)
 
-            try:
-                self._dns_resolve(var_domain, "A")
-            except Exception:
-                self.cache.set("variation", var_domain, {})
-                continue
-
-            result = {
-                "name": self._domain_to_company_name(var_domain),
-                "website": f"https://{var_domain}",
-                "website_domain": var_domain,
-                "url_found": f"https://{var_domain}",
-                "title": "", "snippet": "",
-                "matched_queries": [f"Domain variation: {var_domain}"],
-                "emails": [], "phone": "",
-                "social": {}, "description": "",
-                "meta_title": "", "location": "",
-                "employee_count": "", "technologies": [],
-                "is_similar_domain": True,
-            }
-
-            resp = self._safe_get(f"https://{var_domain}", timeout=5)
-            if resp is not None:
-                soup = BeautifulSoup(resp.text, "lxml")
-                if soup.title and soup.title.string:
-                    result["title"] = soup.title.string.strip()[:200]
-                    result["meta_title"] = result["title"]
-                meta = soup.find("meta", attrs={"name": "description"})
-                if meta and meta.get("content"):
-                    result["description"] = meta["content"].strip()[:500]
-                    result["snippet"] = result["description"]
-
-                final_domain = urlparse(resp.url).netloc.lower()
-                if final_domain.startswith("www."):
-                    final_domain = final_domain[4:]
-                result["website"] = f"https://{final_domain}"
-                result["website_domain"] = final_domain
-
-                if result["title"]:
-                    parts = re.split(r"\s*[\|–\-—]\s*", result["title"])
-                    if parts and 2 < len(parts[0].strip()) < 60:
-                        result["name"] = parts[0].strip()
-
-            results.append(result)
-            self.cache.set("variation", var_domain, result)
+        if to_check:
+            workers = min(5, len(to_check))
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                futures = {executor.submit(self._check_single_variation, d): d for d in to_check}
+                for future in as_completed(futures):
+                    result = future.result()
+                    if result:
+                        results.append(result)
 
         return results
+
+    def _check_single_variation(self, var_domain):
+        """Check a single domain variation — runs in thread pool."""
+        try:
+            self._dns_resolve(var_domain, "A")
+        except Exception:
+            self.cache.set("variation", var_domain, {})
+            return None
+
+        result = {
+            "name": self._domain_to_company_name(var_domain),
+            "website": f"https://{var_domain}",
+            "website_domain": var_domain,
+            "url_found": f"https://{var_domain}",
+            "title": "",
+            "snippet": "",
+            "matched_queries": [f"Domain variation: {var_domain}"],
+            "emails": [],
+            "phone": "",
+            "social": {},
+            "description": "",
+            "meta_title": "",
+            "location": "",
+            "employee_count": "",
+            "technologies": [],
+            "is_similar_domain": True,
+        }
+
+        resp = self._safe_get(f"https://{var_domain}", timeout=5)
+        if resp is not None:
+            soup = BeautifulSoup(resp.text, "lxml")
+            if soup.title and soup.title.string:
+                result["title"] = soup.title.string.strip()[:200]
+                result["meta_title"] = result["title"]
+            meta = soup.find("meta", attrs={"name": "description"})
+            if meta and meta.get("content"):
+                result["description"] = meta["content"].strip()[:500]
+                result["snippet"] = result["description"]
+
+            final_domain = urlparse(resp.url).netloc.lower()
+            if final_domain.startswith("www."):
+                final_domain = final_domain[4:]
+            result["website"] = f"https://{final_domain}"
+            result["website_domain"] = final_domain
+
+            if result["title"]:
+                parts = re.split(r"\s*[\|–\-—]\s*", result["title"])
+                if parts and 2 < len(parts[0].strip()) < 60:
+                    result["name"] = parts[0].strip()
+
+        self.cache.set("variation", var_domain, result)
+        return result
 
     def _discover_contacts(self, companies):
         """Try to find contact emails by checking common email patterns against MX.
@@ -911,13 +1085,12 @@ class BuyerResearcher:
             if not domain_key or company.get("emails"):
                 continue
 
-            self.progress(f"    Probing contacts for {domain_key}...",
-                          step="contacts", current=idx + 1)
+            self.progress(f"    Probing contacts for {domain_key}...", step="contacts", current=idx + 1)
 
             # Check if domain has MX records (accepts email)
             try:
                 self._dns_resolve(domain_key, "MX")
-            except Exception:
+            except Exception:  # noqa: S112
                 continue
 
             # Try common contact page paths
@@ -929,7 +1102,12 @@ class BuyerResearcher:
                         prefix = email_addr.split("@")[0].lower()
                         email_domain = email_addr.split("@")[1].lower()
                         tld_part = email_domain.rsplit(".", 1)[-1]
-                        if prefix not in JUNK_EMAIL_PREFIXES and tld_part not in _FAKE_EMAIL_TLDS and ".." not in email_domain and email_domain == domain_key:
+                        if (
+                            prefix not in JUNK_EMAIL_PREFIXES
+                            and tld_part not in _FAKE_EMAIL_TLDS
+                            and ".." not in email_domain
+                            and email_domain == domain_key
+                        ):
                             if email_addr not in company["emails"]:
                                 company["emails"].append(email_addr)
                     if company["emails"]:
@@ -938,8 +1116,7 @@ class BuyerResearcher:
                     # Also grab phones
                     if not company.get("phone"):
                         phones = PHONE_RE.findall(resp.text)
-                        valid = [p.strip() for p in phones
-                                 if len(re.sub(r'\D', '', p)) >= 10]
+                        valid = [p.strip() for p in phones if len(re.sub(r"\D", "", p)) >= 10]
                         if valid:
                             company["phone"] = valid[0]
 

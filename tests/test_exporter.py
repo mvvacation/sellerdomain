@@ -3,8 +3,6 @@
 import csv
 import json
 
-import pytest
-
 from core.exporter import export, export_csv, export_json
 
 

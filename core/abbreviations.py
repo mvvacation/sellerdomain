@@ -8,20 +8,60 @@ common initialisms, and contextual clues from neighbouring keywords.
 # ── Geographic codes ─────────────────────────────────────────────────────
 # US states / territories
 US_STATES = {
-    "al": "Alabama", "ak": "Alaska", "az": "Arizona", "ar": "Arkansas",
-    "ca": "California", "co": "Colorado", "ct": "Connecticut", "de": "Delaware",
-    "fl": "Florida", "ga": "Georgia", "hi": "Hawaii", "id": "Idaho",
-    "il": "Illinois", "in": "Indiana", "ia": "Iowa", "ks": "Kansas",
-    "ky": "Kentucky", "la": "Louisiana", "me": "Maine", "md": "Maryland",
-    "ma": "Massachusetts", "mi": "Michigan", "mn": "Minnesota", "ms": "Mississippi",
-    "mo": "Missouri", "mt": "Montana", "ne": "Nebraska", "nv": "Nevada",
-    "nh": "New Hampshire", "nj": "New Jersey", "nm": "New Mexico", "ny": "New York",
-    "nc": "North Carolina", "nd": "North Dakota", "oh": "Ohio", "ok": "Oklahoma",
-    "or": "Oregon", "pa": "Pennsylvania", "ri": "Rhode Island", "sc": "South Carolina",
-    "sd": "South Dakota", "tn": "Tennessee", "tx": "Texas", "ut": "Utah",
-    "vt": "Vermont", "va": "Virginia", "wa": "Washington", "wv": "West Virginia",
-    "wi": "Wisconsin", "wy": "Wyoming", "dc": "Washington DC",
-    "pr": "Puerto Rico", "vi": "US Virgin Islands", "gu": "Guam",
+    "al": "Alabama",
+    "ak": "Alaska",
+    "az": "Arizona",
+    "ar": "Arkansas",
+    "ca": "California",
+    "co": "Colorado",
+    "ct": "Connecticut",
+    "de": "Delaware",
+    "fl": "Florida",
+    "ga": "Georgia",
+    "hi": "Hawaii",
+    "id": "Idaho",
+    "il": "Illinois",
+    "in": "Indiana",
+    "ia": "Iowa",
+    "ks": "Kansas",
+    "ky": "Kentucky",
+    "la": "Louisiana",
+    "me": "Maine",
+    "md": "Maryland",
+    "ma": "Massachusetts",
+    "mi": "Michigan",
+    "mn": "Minnesota",
+    "ms": "Mississippi",
+    "mo": "Missouri",
+    "mt": "Montana",
+    "ne": "Nebraska",
+    "nv": "Nevada",
+    "nh": "New Hampshire",
+    "nj": "New Jersey",
+    "nm": "New Mexico",
+    "ny": "New York",
+    "nc": "North Carolina",
+    "nd": "North Dakota",
+    "oh": "Ohio",
+    "ok": "Oklahoma",
+    "or": "Oregon",
+    "pa": "Pennsylvania",
+    "ri": "Rhode Island",
+    "sc": "South Carolina",
+    "sd": "South Dakota",
+    "tn": "Tennessee",
+    "tx": "Texas",
+    "ut": "Utah",
+    "vt": "Vermont",
+    "va": "Virginia",
+    "wa": "Washington",
+    "wv": "West Virginia",
+    "wi": "Wisconsin",
+    "wy": "Wyoming",
+    "dc": "Washington DC",
+    "pr": "Puerto Rico",
+    "vi": "US Virgin Islands",
+    "gu": "Guam",
 }
 
 # Major US metropolitan area abbreviations
@@ -128,20 +168,58 @@ ISLAND_ABBREV = {
 
 # Country codes (ISO 3166-1 alpha-2) — selective, most useful
 COUNTRY_CODES = {
-    "us": "United States", "gb": "United Kingdom", "uk": "United Kingdom",
-    "ca": "Canada", "au": "Australia", "nz": "New Zealand",
-    "ie": "Ireland", "de": "Germany", "fr": "France", "es": "Spain",
-    "it": "Italy", "nl": "Netherlands", "se": "Sweden", "no": "Norway",
-    "dk": "Denmark", "fi": "Finland", "pt": "Portugal", "ch": "Switzerland",
-    "at": "Austria", "be": "Belgium", "pl": "Poland", "cz": "Czech Republic",
-    "jp": "Japan", "cn": "China", "kr": "South Korea", "in": "India",
-    "sg": "Singapore", "hk": "Hong Kong", "tw": "Taiwan", "th": "Thailand",
-    "my": "Malaysia", "ph": "Philippines", "id": "Indonesia", "vn": "Vietnam",
-    "ae": "UAE", "sa": "Saudi Arabia", "il": "Israel", "tr": "Turkey",
-    "za": "South Africa", "ng": "Nigeria", "ke": "Kenya", "eg": "Egypt",
-    "br": "Brazil", "mx": "Mexico", "ar": "Argentina", "cl": "Chile",
-    "co": "Colombia", "pe": "Peru",
-    "mv": "Maldives", "lk": "Sri Lanka", "np": "Nepal", "bd": "Bangladesh",
+    "us": "United States",
+    "gb": "United Kingdom",
+    "uk": "United Kingdom",
+    "ca": "Canada",
+    "au": "Australia",
+    "nz": "New Zealand",
+    "ie": "Ireland",
+    "de": "Germany",
+    "fr": "France",
+    "es": "Spain",
+    "it": "Italy",
+    "nl": "Netherlands",
+    "se": "Sweden",
+    "no": "Norway",
+    "dk": "Denmark",
+    "fi": "Finland",
+    "pt": "Portugal",
+    "ch": "Switzerland",
+    "at": "Austria",
+    "be": "Belgium",
+    "pl": "Poland",
+    "cz": "Czech Republic",
+    "jp": "Japan",
+    "cn": "China",
+    "kr": "South Korea",
+    "in": "India",
+    "sg": "Singapore",
+    "hk": "Hong Kong",
+    "tw": "Taiwan",
+    "th": "Thailand",
+    "my": "Malaysia",
+    "ph": "Philippines",
+    "id": "Indonesia",
+    "vn": "Vietnam",
+    "ae": "UAE",
+    "sa": "Saudi Arabia",
+    "il": "Israel",
+    "tr": "Turkey",
+    "za": "South Africa",
+    "ng": "Nigeria",
+    "ke": "Kenya",
+    "eg": "Egypt",
+    "br": "Brazil",
+    "mx": "Mexico",
+    "ar": "Argentina",
+    "cl": "Chile",
+    "co": "Colombia",
+    "pe": "Peru",
+    "mv": "Maldives",
+    "lk": "Sri Lanka",
+    "np": "Nepal",
+    "bd": "Bangladesh",
 }
 
 # ── Industry / niche abbreviations ───────────────────────────────────────
@@ -206,10 +284,22 @@ COMMON_PREFIXES = {
 # Key = neighbour keyword, Value = dict of {abbrev: preferred_expansion}
 CONTEXT_HINTS = {
     # Food / dining context → prefer location meaning
-    "restaurant": {"mv": "Martha's Vineyard", "la": "Los Angeles", "sf": "San Francisco",
-                   "dc": "Washington DC", "kc": "Kansas City", "nola": "New Orleans"},
-    "restaurants": {"mv": "Martha's Vineyard", "la": "Los Angeles", "sf": "San Francisco",
-                    "dc": "Washington DC", "kc": "Kansas City", "nola": "New Orleans"},
+    "restaurant": {
+        "mv": "Martha's Vineyard",
+        "la": "Los Angeles",
+        "sf": "San Francisco",
+        "dc": "Washington DC",
+        "kc": "Kansas City",
+        "nola": "New Orleans",
+    },
+    "restaurants": {
+        "mv": "Martha's Vineyard",
+        "la": "Los Angeles",
+        "sf": "San Francisco",
+        "dc": "Washington DC",
+        "kc": "Kansas City",
+        "nola": "New Orleans",
+    },
     "food": {"mv": "Martha's Vineyard", "la": "Los Angeles", "ny": "New York"},
     "foods": {"mv": "Martha's Vineyard", "la": "Los Angeles", "ny": "New York"},
     "eat": {"mv": "Martha's Vineyard", "la": "Los Angeles"},
@@ -227,7 +317,6 @@ CONTEXT_HINTS = {
     "grill": {"mv": "Martha's Vineyard"},
     "bakery": {"mv": "Martha's Vineyard", "sf": "San Francisco"},
     "brew": {"den": "Denver", "pdx": "Portland", "sd": "San Diego"},
-
     # Hotel / travel / tourism context → prefer destination
     "hotel": {"mv": "Maldives", "la": "Los Angeles", "lv": "Las Vegas"},
     "hotels": {"mv": "Maldives", "la": "Los Angeles", "lv": "Las Vegas"},
@@ -239,7 +328,7 @@ CONTEXT_HINTS = {
     "tours": {"mv": "Maldives", "la": "Los Angeles"},
     "trip": {"mv": "Maldives"},
     "booking": {"mv": "Maldives"},
-    "vacation": {"mv": "Maldives", "mv": "Martha's Vineyard"},
+    "vacation": {"mv": "Maldives"},
     "getaway": {"mv": "Maldives"},
     "beach": {"mv": "Maldives"},
     "island": {"mv": "Maldives"},
@@ -249,14 +338,12 @@ CONTEXT_HINTS = {
     "snorkel": {"mv": "Maldives"},
     "cruise": {"mv": "Maldives"},
     "yacht": {"mv": "Maldives"},
-
     # Real estate context → prefer location
     "homes": {"la": "Los Angeles", "sf": "San Francisco", "dc": "Washington DC"},
     "realty": {"la": "Los Angeles", "sf": "San Francisco"},
     "property": {"la": "Los Angeles", "mv": "Martha's Vineyard"},
-    "rentals": {"la": "Los Angeles", "mv": "Martha's Vineyard", "mv": "Maldives"},
+    "rentals": {"la": "Los Angeles", "mv": "Martha's Vineyard"},
     "rent": {"la": "Los Angeles", "sf": "San Francisco"},
-
     # Services context → prefer location
     "plumber": {"dc": "Washington DC", "la": "Los Angeles"},
     "plumbing": {"dc": "Washington DC", "la": "Los Angeles"},
@@ -290,8 +377,6 @@ def expand_abbreviations(keywords, domain_name=""):
     # Partition keywords into "short" (potential abbreviation) and "long" (context)
     short_tokens = [k for k in keywords_lower if len(k) <= 4]
     long_tokens = [k for k in keywords_lower if len(k) > 4]
-    # Also include 3-4 char tokens that might be real words but could also be abbreviations
-    medium_tokens = [k for k in keywords_lower if len(k) in (3, 4)]
 
     for token in short_tokens:
         token_interps = _expand_single_token(token, long_tokens, keywords_lower)
@@ -314,8 +399,7 @@ def expand_abbreviations(keywords, domain_name=""):
 
     # Build geo_targets from geographic interpretations
     for interp in interpretations:
-        if interp["type"] in ("geo_metro", "geo_state", "geo_country", "geo_island",
-                               "geo_other", "geo_context"):
+        if interp["type"] in ("geo_metro", "geo_state", "geo_country", "geo_island", "geo_other", "geo_context"):
             if interp["expansion"] not in geo_targets:
                 geo_targets.append(interp["expansion"])
 
@@ -358,23 +442,27 @@ def _expand_single_token(token, context_keywords, all_keywords):
     for ctx_kw in context_keywords:
         hints = CONTEXT_HINTS.get(ctx_kw, {})
         if token in hints:
-            results.append({
-                "token": token,
-                "expansion": hints[token],
-                "type": "geo_context",
-                "confidence": 0.95,
-                "reason": f"'{token}' + '{ctx_kw}' → {hints[token]}",
-            })
+            results.append(
+                {
+                    "token": token,
+                    "expansion": hints[token],
+                    "type": "geo_context",
+                    "confidence": 0.95,
+                    "reason": f"'{token}' + '{ctx_kw}' → {hints[token]}",
+                }
+            )
 
     # 2. US metro areas
     if token in US_METRO:
-        results.append({
-            "token": token,
-            "expansion": US_METRO[token],
-            "type": "geo_metro",
-            "confidence": 0.85,
-            "reason": f"'{token}' is a US metro abbreviation for {US_METRO[token]}",
-        })
+        results.append(
+            {
+                "token": token,
+                "expansion": US_METRO[token],
+                "type": "geo_metro",
+                "confidence": 0.85,
+                "reason": f"'{token}' is a US metro abbreviation for {US_METRO[token]}",
+            }
+        )
 
     # 3. Island / destination codes
     if token in ISLAND_ABBREV:
@@ -382,62 +470,72 @@ def _expand_single_token(token, context_keywords, all_keywords):
         # Don't duplicate if already in results with higher confidence
         existing = {r["expansion"] for r in results}
         if exp not in existing:
-            results.append({
-                "token": token,
-                "expansion": exp,
-                "type": "geo_island",
-                "confidence": 0.75,
-                "reason": f"'{token}' is an abbreviation for {exp}",
-            })
+            results.append(
+                {
+                    "token": token,
+                    "expansion": exp,
+                    "type": "geo_island",
+                    "confidence": 0.75,
+                    "reason": f"'{token}' is an abbreviation for {exp}",
+                }
+            )
 
     # 4. Geographic abbreviations
     if token in GEO_ABBREV:
         exp = GEO_ABBREV[token]
         existing = {r["expansion"] for r in results}
         if exp not in existing:
-            results.append({
-                "token": token,
-                "expansion": exp,
-                "type": "geo_other",
-                "confidence": 0.70,
-                "reason": f"'{token}' → {exp}",
-            })
+            results.append(
+                {
+                    "token": token,
+                    "expansion": exp,
+                    "type": "geo_other",
+                    "confidence": 0.70,
+                    "reason": f"'{token}' → {exp}",
+                }
+            )
 
     # 5. US state codes (only 2-letter tokens)
     if len(token) == 2 and token in US_STATES:
         exp = US_STATES[token]
         existing = {r["expansion"] for r in results}
         if exp not in existing:
-            results.append({
-                "token": token,
-                "expansion": exp,
-                "type": "geo_state",
-                "confidence": 0.60,
-                "reason": f"'{token}' is the US state code for {exp}",
-            })
+            results.append(
+                {
+                    "token": token,
+                    "expansion": exp,
+                    "type": "geo_state",
+                    "confidence": 0.60,
+                    "reason": f"'{token}' is the US state code for {exp}",
+                }
+            )
 
     # 6. Country codes (lower confidence for ambiguous ones)
     if len(token) == 2 and token in COUNTRY_CODES:
         exp = COUNTRY_CODES[token]
         existing = {r["expansion"] for r in results}
         if exp not in existing:
-            results.append({
-                "token": token,
-                "expansion": exp,
-                "type": "geo_country",
-                "confidence": 0.45,
-                "reason": f"'{token}' is the country code for {exp}",
-            })
+            results.append(
+                {
+                    "token": token,
+                    "expansion": exp,
+                    "type": "geo_country",
+                    "confidence": 0.45,
+                    "reason": f"'{token}' is the country code for {exp}",
+                }
+            )
 
     # 7. Industry abbreviations
     if token in INDUSTRY_ABBREV:
-        results.append({
-            "token": token,
-            "expansion": INDUSTRY_ABBREV[token],
-            "type": "industry",
-            "confidence": 0.65,
-            "reason": f"'{token}' = {INDUSTRY_ABBREV[token]}",
-        })
+        results.append(
+            {
+                "token": token,
+                "expansion": INDUSTRY_ABBREV[token],
+                "type": "industry",
+                "confidence": 0.65,
+                "reason": f"'{token}' = {INDUSTRY_ABBREV[token]}",
+            }
+        )
 
     return results
 
@@ -448,16 +546,18 @@ def _check_compound_patterns(name, keywords, interpretations):
     """
     for prefix, meaning in COMMON_PREFIXES.items():
         if name.startswith(prefix) and len(name) > len(prefix) + 2:
-            rest = name[len(prefix):]
+            rest = name[len(prefix) :]
             # Check if the rest is a real word (appears in keywords or is long)
             if rest in keywords or len(rest) >= 4:
-                interpretations.append({
-                    "token": prefix,
-                    "expansion": meaning,
-                    "type": "prefix",
-                    "confidence": 0.50,
-                    "reason": f"Prefix pattern: '{prefix}' + '{rest}'",
-                })
+                interpretations.append(
+                    {
+                        "token": prefix,
+                        "expansion": meaning,
+                        "type": "prefix",
+                        "confidence": 0.50,
+                        "reason": f"Prefix pattern: '{prefix}' + '{rest}'",
+                    }
+                )
 
 
 def _build_niche_context(interpretations, long_tokens, all_keywords):

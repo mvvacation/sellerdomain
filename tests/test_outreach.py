@@ -1,8 +1,6 @@
 """Tests for outreach email generation."""
 
-import pytest
-
-from core.outreach import generate_outreach_email, generate_all_templates
+from core.outreach import generate_all_templates, generate_outreach_email
 
 
 def _make_analysis(**overrides):

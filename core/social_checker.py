@@ -104,10 +104,7 @@ def check_social_handles(domain_name):
     try:
         # Check all platforms concurrently
         with ThreadPoolExecutor(max_workers=len(PLATFORMS)) as executor:
-            futures = {
-                executor.submit(_check_single_platform, session, p, handle): p
-                for p in PLATFORMS
-            }
+            futures = {executor.submit(_check_single_platform, session, p, handle): p for p in PLATFORMS}
             # Collect results preserving platform order
             results_map = {}
             for future in as_completed(futures):

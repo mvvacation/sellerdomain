@@ -1,31 +1,28 @@
 """CLI interface v2 - rich progress bars, spinners, batch mode, interactive, HTML reports."""
 
-import os
-import sys
-import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import click
+from rich import box
 from rich.console import Console
-from rich.live import Live
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeElapsedColumn
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+from rich.prompt import Prompt
 from rich.table import Table
 from rich.text import Text
-from rich.prompt import Prompt, Confirm
-from rich import box
 
-from core.config import Config
 from core.analyzer import DomainAnalyzer
-from core.researcher_v2 import BuyerResearcher
-from core.lead_scorer import LeadScorer
+from core.config import Config
 from core.exporter import export
-from core.html_report import generate_html_report
-from core.outreach import generate_outreach_email, generate_all_templates
 from core.history import check_domain_history
-from core.social_checker import check_social_handles
+from core.html_report import generate_html_report
+from core.lead_scorer import LeadScorer
 from core.market_comp import find_comparable_sales
-from core.validators import validate_domain, ValidationError
+from core.outreach import generate_all_templates, generate_outreach_email
+from core.researcher_v2 import BuyerResearcher
+from core.social_checker import check_social_handles
+from core.validators import ValidationError, validate_domain
 
 console = Console()
 
@@ -41,53 +38,52 @@ def print_banner():
 
 def print_analysis(analysis):
     """Print domain analysis results with color-coded value."""
-    tbl = Table(box=box.ROUNDED, border_style="green", title="[bold]Domain Analysis[/]",
-                show_header=False, padding=(0, 2))
+    tbl = Table(
+        box=box.ROUNDED, border_style="green", title="[bold]Domain Analysis[/]", show_header=False, padding=(0, 2)
+    )
     tbl.add_column("Field", style="cyan", width=14)
     tbl.add_column("Value", style="white")
 
     tbl.add_row("Domain", f"[bold]{analysis['domain']}[/]")
-    tbl.add_row("Name", analysis['name'])
+    tbl.add_row("Name", analysis["name"])
     tbl.add_row("TLD", f".{analysis['tld']}")
-    tbl.add_row("Keywords", ", ".join(analysis['keywords']))
+    tbl.add_row("Keywords", ", ".join(analysis["keywords"]))
 
-    industries = [i.replace('_', ' ').title() for i in analysis['industries']]
+    industries = [i.replace("_", " ").title() for i in analysis["industries"]]
     tbl.add_row("Industries", ", ".join(industries))
 
-    if analysis.get('domain_age_years'):
-        age = analysis['domain_age_years']
+    if analysis.get("domain_age_years"):
+        age = analysis["domain_age_years"]
         age_style = "bold green" if age >= 10 else "green" if age >= 5 else "yellow"
         tbl.add_row("Domain Age", f"[{age_style}]~{age} years[/]")
 
-    val_low = analysis.get('estimated_value_low', 0)
-    val_high = analysis.get('estimated_value_high', 0)
+    val_low = analysis.get("estimated_value_low", 0)
+    val_high = analysis.get("estimated_value_high", 0)
     tbl.add_row("Est. Value", f"[bold green]${val_low:,} — ${val_high:,}[/]")
 
     console.print(tbl)
 
     # WHOIS panel (compact)
-    whois_data = analysis.get('whois', {})
+    whois_data = analysis.get("whois", {})
     if whois_data:
         parts = []
-        if whois_data.get('registrar'):
+        if whois_data.get("registrar"):
             parts.append(f"[cyan]Registrar:[/] {whois_data['registrar']}")
-        if whois_data.get('creation_date'):
+        if whois_data.get("creation_date"):
             parts.append(f"[cyan]Created:[/] {str(whois_data['creation_date'])[:10]}")
-        if whois_data.get('expiration_date'):
+        if whois_data.get("expiration_date"):
             parts.append(f"[cyan]Expires:[/] {str(whois_data['expiration_date'])[:10]}")
-        if whois_data.get('registrant'):
+        if whois_data.get("registrant"):
             parts.append(f"[cyan]Registrant:[/] {whois_data['registrant']}")
         if parts:
-            console.print(Panel("  |  ".join(parts), title="WHOIS", border_style="dim",
-                                padding=(0, 1)))
+            console.print(Panel("  |  ".join(parts), title="WHOIS", border_style="dim", padding=(0, 1)))
 
     # DNS (compact)
-    dns_data = analysis.get('dns', {})
+    dns_data = analysis.get("dns", {})
     active = {k: v for k, v in dns_data.items() if v}
     if active:
         dns_parts = [f"[cyan]{k}:[/] {', '.join(v[:2])}" for k, v in active.items()]
-        console.print(Panel("  |  ".join(dns_parts), title="DNS", border_style="dim",
-                            padding=(0, 1)))
+        console.print(Panel("  |  ".join(dns_parts), title="DNS", border_style="dim", padding=(0, 1)))
 
 
 def print_enrichment(analysis):
@@ -105,8 +101,7 @@ def print_enrichment(analysis):
             parts.append(f"[cyan]{i['token']}[/] → {i['expansion']} ({pct}%)")
         if geo:
             parts.append(f"[bold]Geo:[/] {', '.join(geo)}")
-        console.print(Panel("\n".join(parts), title="🧠 Smart Interpretation",
-                            border_style="magenta", padding=(0, 1)))
+        console.print(Panel("\n".join(parts), title="🧠 Smart Interpretation", border_style="magenta", padding=(0, 1)))
 
     # History
     hist = analysis.get("history", {})
@@ -120,8 +115,7 @@ def print_enrichment(analysis):
             h_parts.append(f"[cyan]Years active:[/] {hist['years_active']}")
         if hist.get("past_usage"):
             h_parts.append(f"[cyan]Past usage:[/] {hist['past_usage']}")
-        console.print(Panel("  |  ".join(h_parts), title="📜 Domain History",
-                            border_style="yellow", padding=(0, 1)))
+        console.print(Panel("  |  ".join(h_parts), title="📜 Domain History", border_style="yellow", padding=(0, 1)))
 
     # Social handles
     social = analysis.get("social_handles", {})
@@ -133,9 +127,14 @@ def print_enrichment(analysis):
             style = "green" if h["status"] == "taken" else "red" if h["status"] == "available" else "dim"
             s_parts.append(f"[{style}]{icon} {h['platform']}[/]")
         summary = social.get("summary", "")
-        console.print(Panel("  ".join(s_parts) + (f"\n{summary}" if summary else ""),
-                            title=f"📱 @{social.get('handle', '')}",
-                            border_style="blue", padding=(0, 1)))
+        console.print(
+            Panel(
+                "  ".join(s_parts) + (f"\n{summary}" if summary else ""),
+                title=f"📱 @{social.get('handle', '')}",
+                border_style="blue",
+                padding=(0, 1),
+            )
+        )
 
     # Market comparables
     market = analysis.get("market_comp", {})
@@ -167,7 +166,6 @@ def run_research_with_progress(cfg, analysis, verbose):
         "similar": "Checking similar domains",
         "contacts": "Discovering contacts",
     }
-    step_totals = {}
     current_step = {"name": ""}
 
     progress = Progress(
@@ -186,14 +184,15 @@ def run_research_with_progress(cfg, analysis, verbose):
         if step != current_step["name"]:
             current_step["name"] = step
             if total:
-                progress.update(task_id, total=total, completed=0, description=desc,
-                                detail=msg if verbose else "")
+                progress.update(task_id, total=total, completed=0, description=desc, detail=msg if verbose else "")
             else:
-                progress.update(task_id, total=None, completed=0, description=desc,
-                                detail=msg if verbose else "")
+                progress.update(task_id, total=None, completed=0, description=desc, detail=msg if verbose else "")
         elif current is not None:
-            progress.update(task_id, completed=current,
-                            detail=msg if verbose else f"{current}/{progress.tasks[task_id].total or '?'}")
+            progress.update(
+                task_id,
+                completed=current,
+                detail=msg if verbose else f"{current}/{progress.tasks[task_id].total or '?'}",
+            )
         elif verbose:
             progress.update(task_id, detail=msg)
 
@@ -212,10 +211,10 @@ def print_leads_table(leads, analysis):
         return
 
     console.print()
-    hot = sum(1 for l in leads if l.get("relevance_score", 0) >= 70)
-    warm = sum(1 for l in leads if 50 <= l.get("relevance_score", 0) < 70)
-    with_email = sum(1 for l in leads if l.get("emails"))
-    with_phone = sum(1 for l in leads if l.get("phone"))
+    hot = sum(1 for ld in leads if ld.get("relevance_score", 0) >= 70)
+    warm = sum(1 for ld in leads if 50 <= ld.get("relevance_score", 0) < 70)
+    with_email = sum(1 for ld in leads if ld.get("emails"))
+    with_phone = sum(1 for ld in leads if ld.get("phone"))
 
     stats = Table(box=box.SIMPLE, show_header=False, padding=(0, 2))
     stats.add_column("", style="bold")
@@ -223,7 +222,7 @@ def print_leads_table(leads, analysis):
     stats.add_row(
         f"[bold green]{len(leads)}[/] leads found",
         f"[green]{hot}[/] hot  |  [yellow]{warm}[/] warm  |  "
-        f"[cyan]{with_email}[/] emails  |  [blue]{with_phone}[/] phones"
+        f"[cyan]{with_email}[/] emails  |  [blue]{with_phone}[/] phones",
     )
     console.print(Panel(stats, border_style="blue", title="[bold]Results Summary[/]"))
 
@@ -259,8 +258,7 @@ def print_leads_table(leads, analysis):
         reasons = lead.get("relevance_reasons", ["—"])
         why = reasons[0][:40] if reasons else "—"
 
-        tbl.add_row(str(i), lead.get("name", "?"), lead.get("website_domain", ""),
-                     score_text, contact, why)
+        tbl.add_row(str(i), lead.get("name", "?"), lead.get("website_domain", ""), score_text, contact, why)
 
     console.print(tbl)
 
@@ -283,58 +281,62 @@ def print_lead_detail(lead, idx, analysis):
     lines.append(f"[cyan]Website:[/] {lead.get('website', 'N/A')}")
     lines.append(f"[cyan]Score:[/] {score}/100")
 
-    desc = lead.get('description', '') or lead.get('snippet', '')
+    desc = lead.get("description", "") or lead.get("snippet", "")
     if desc:
         if len(desc) > 200:
             desc = desc[:197] + "..."
         lines.append(f"\n[cyan]About:[/] {desc}")
 
-    if lead.get('emails'):
+    if lead.get("emails"):
         lines.append(f"\n[cyan]Emails:[/] {', '.join(lead['emails'][:5])}")
-    if lead.get('phone'):
+    if lead.get("phone"):
         lines.append(f"[cyan]Phone:[/] {lead['phone']}")
-    if lead.get('location'):
+    if lead.get("location"):
         lines.append(f"[cyan]Location:[/] {lead['location']}")
-    if lead.get('employee_count'):
+    if lead.get("employee_count"):
         lines.append(f"[cyan]Size:[/] {lead['employee_count']}")
 
-    social = lead.get('social', {})
+    social = lead.get("social", {})
     if social:
         social_parts = []
         for name, url in social.items():
             social_parts.append(f"{name.title()}: {url}")
         lines.append(f"\n[cyan]Social:[/] {' | '.join(social_parts)}")
 
-    techs = lead.get('technologies', [])
+    techs = lead.get("technologies", [])
     if techs:
         lines.append(f"[cyan]Tech Stack:[/] {', '.join(techs)}")
 
-    reasons = lead.get('relevance_reasons', [])
+    reasons = lead.get("relevance_reasons", [])
     if reasons:
-        lines.append(f"\n[cyan]Why relevant:[/]")
+        lines.append("\n[cyan]Why relevant:[/]")
         for r in reasons:
             lines.append(f"  [dim]→[/] {r}")
 
-    console.print(Panel("\n".join(lines), title=f"[bold]Lead #{idx}[/]",
-                        border_style=border, padding=(1, 2)))
+    console.print(Panel("\n".join(lines), title=f"[bold]Lead #{idx}[/]", border_style=border, padding=(1, 2)))
 
 
 def print_outreach_email(lead, analysis):
     """Print outreach email for a lead."""
     email = generate_outreach_email(lead, analysis)
-    console.print(Panel(
-        f"[bold cyan]Subject:[/] {email['subject']}\n\n{email['body']}",
-        title=f"[bold]Outreach Email — {lead.get('name', 'Lead')}[/]",
-        border_style="magenta", padding=(1, 2),
-    ))
+    console.print(
+        Panel(
+            f"[bold cyan]Subject:[/] {email['subject']}\n\n{email['body']}",
+            title=f"[bold]Outreach Email — {lead.get('name', 'Lead')}[/]",
+            border_style="magenta",
+            padding=(1, 2),
+        )
+    )
 
 
 def interactive_mode(leads, analysis):
     """Interactive mode — browse, inspect, and generate emails for leads."""
     console.print("\n[bold blue]Interactive Mode[/] — type commands below\n")
-    console.print("[dim]Commands: [bold]view N[/] (detail) | [bold]email N[/] (outreach) | "
-                  "[bold]emails N[/] (all templates) | [bold]list[/] (table) | "
-                  "[bold]export FILE[/] | [bold]html FILE[/] | [bold]quit[/][/]\n")
+    console.print(
+        "[dim]Commands: [bold]view N[/] (detail) | [bold]email N[/] (outreach) | "
+        "[bold]emails N[/] (all templates) | [bold]list[/] (table) | "
+        "[bold]export FILE[/] | [bold]html FILE[/] | [bold]quit[/][/]\n"
+    )
 
     while True:
         try:
@@ -370,11 +372,14 @@ def interactive_mode(leads, analysis):
                 if 1 <= idx <= len(leads):
                     templates = generate_all_templates(leads[idx - 1], analysis)
                     for ttype, email_data in templates.items():
-                        console.print(Panel(
-                            f"[bold cyan]Subject:[/] {email_data['subject']}\n\n{email_data['body']}",
-                            title=f"[bold]{ttype.replace('_', ' ').title()} Template[/]",
-                            border_style="magenta", padding=(1, 2),
-                        ))
+                        console.print(
+                            Panel(
+                                f"[bold cyan]Subject:[/] {email_data['subject']}\n\n{email_data['body']}",
+                                title=f"[bold]{ttype.replace('_', ' ').title()} Template[/]",
+                                border_style="magenta",
+                                padding=(1, 2),
+                            )
+                        )
                 else:
                     console.print(f"[red]Invalid. Use 1-{len(leads)}[/]")
             except ValueError:
@@ -398,8 +403,7 @@ def interactive_mode(leads, analysis):
             console.print("[dim]Unknown command. Use: view N, email N, emails N, list, export FILE, html FILE, quit[/]")
 
 
-def process_single_domain(domain, cfg, verbose, max_leads, export_file, show_email, html_file,
-                           do_interactive):
+def process_single_domain(domain, cfg, verbose, max_leads, export_file, show_email, html_file, do_interactive):
     """Process a single domain — full pipeline."""
     console.print(f"\n[bold blue]▶ Step 1:[/] Analyzing [bold cyan]{domain}[/]...\n")
 
@@ -413,21 +417,21 @@ def process_single_domain(domain, cfg, verbose, max_leads, export_file, show_ema
 
     print_analysis(analysis)
 
-    # Enrichment: domain history, social handles, market comparables
-    with console.status("[bold]Checking domain history & social handles...[/]", spinner="dots"):
-        try:
-            analysis["history"] = check_domain_history(domain)
-        except Exception:
-            analysis["history"] = {}
-        try:
-            analysis["social_handles"] = check_social_handles(analysis["name"])
-        except Exception:
-            analysis["social_handles"] = {}
-        try:
-            analysis["market_comp"] = find_comparable_sales(
-                analysis["name"], analysis["tld"], analysis["keywords"])
-        except Exception:
-            analysis["market_comp"] = {}
+    # Enrichment: domain history, social handles, market comparables — concurrent
+    with console.status("[bold]Checking domain history, social handles & market comparables...[/]", spinner="dots"):
+        enrichment_fns = {
+            "history": lambda: check_domain_history(domain),
+            "social_handles": lambda: check_social_handles(analysis["name"]),
+            "market_comp": lambda: find_comparable_sales(analysis["name"], analysis["tld"], analysis["keywords"]),
+        }
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = {executor.submit(fn): key for key, fn in enrichment_fns.items()}
+            for future in as_completed(futures):
+                key = futures[future]
+                try:
+                    analysis[key] = future.result()
+                except Exception:
+                    analysis[key] = {}
 
     print_enrichment(analysis)
     console.print()
@@ -446,7 +450,7 @@ def process_single_domain(domain, cfg, verbose, max_leads, export_file, show_ema
         scored_leads = scorer.score_and_rank(raw_leads)
 
     min_score = cfg.get("leads", "min_score", default=20)
-    scored_leads = [l for l in scored_leads if l["relevance_score"] >= min_score]
+    scored_leads = [ld for ld in scored_leads if ld["relevance_score"] >= min_score]
 
     lead_limit = max_leads if max_leads > 0 else cfg.get("leads", "max_leads", default=20)
     scored_leads = scored_leads[:lead_limit]
@@ -491,9 +495,9 @@ def process_single_domain(domain, cfg, verbose, max_leads, export_file, show_ema
 
     # Summary
     console.print()
-    high_q = sum(1 for l in scored_leads if l["relevance_score"] >= 50)
-    with_mail = sum(1 for l in scored_leads if l.get("emails"))
-    with_phone = sum(1 for l in scored_leads if l.get("phone"))
+    high_q = sum(1 for ld in scored_leads if ld["relevance_score"] >= 50)
+    with_mail = sum(1 for ld in scored_leads if ld.get("emails"))
+    with_phone = sum(1 for ld in scored_leads if ld.get("phone"))
     console.print(
         f"[bold]Summary:[/] [green]{len(scored_leads)}[/] buyers for [cyan]{domain}[/]"
         f"  |  [green]{high_q}[/] high-relevance"
@@ -521,8 +525,20 @@ def process_single_domain(domain, cfg, verbose, max_leads, export_file, show_ema
 @click.option("--interactive", "-i", is_flag=True, help="Enter interactive mode after results")
 @click.option("--no-cache", is_flag=True, help="Disable result caching")
 @click.option("--clear-cache", is_flag=True, help="Clear cached results and exit")
-def main(domains, analyze_only, max_leads, export_file, html_file, serpapi_key,
-         config_path, verbose, show_email, interactive, no_cache, clear_cache):
+def main(
+    domains,
+    analyze_only,
+    max_leads,
+    export_file,
+    html_file,
+    serpapi_key,
+    config_path,
+    verbose,
+    show_email,
+    interactive,
+    no_cache,
+    clear_cache,
+):
     """Analyze domains and find potential buyers.
 
     DOMAINS: One or more domain names to sell (e.g., healthtrack.com cloudpay.io)
@@ -552,6 +568,7 @@ def main(domains, analyze_only, max_leads, export_file, html_file, serpapi_key,
     # Clear cache
     if clear_cache:
         from core.cache import SearchCache
+
         SearchCache(enabled=True).clear()
         console.print("[bold green]✓ Cache cleared.[/]")
         return
@@ -566,20 +583,23 @@ def main(domains, analyze_only, max_leads, export_file, html_file, serpapi_key,
                     analysis = analyzer.analyze()
                 print_analysis(analysis)
 
-                with console.status("[bold]Checking domain history & social handles...[/]", spinner="dots"):
-                    try:
-                        analysis["history"] = check_domain_history(domain)
-                    except Exception:
-                        analysis["history"] = {}
-                    try:
-                        analysis["social_handles"] = check_social_handles(analysis["name"])
-                    except Exception:
-                        analysis["social_handles"] = {}
-                    try:
-                        analysis["market_comp"] = find_comparable_sales(
-                            analysis["name"], analysis["tld"], analysis["keywords"])
-                    except Exception:
-                        analysis["market_comp"] = {}
+                with console.status(
+                    "[bold]Checking domain history, social handles & market comparables...[/]", spinner="dots"
+                ):
+                    _d, _a = domain, analysis
+                    enrichment_fns = {
+                        "history": lambda d=_d: check_domain_history(d),
+                        "social_handles": lambda a=_a: check_social_handles(a["name"]),
+                        "market_comp": lambda a=_a: find_comparable_sales(a["name"], a["tld"], a["keywords"]),
+                    }
+                    with ThreadPoolExecutor(max_workers=3) as executor:
+                        futures = {executor.submit(fn): key for key, fn in enrichment_fns.items()}
+                        for future in as_completed(futures):
+                            key = futures[future]
+                            try:
+                                analysis[key] = future.result()
+                            except Exception:
+                                analysis[key] = {}
                 print_enrichment(analysis)
             except Exception as e:
                 console.print(f"[bold red]Error:[/] {e}")
@@ -607,8 +627,13 @@ def main(domains, analyze_only, max_leads, export_file, html_file, serpapi_key,
                 batch_html = f"{stem}_{domain.replace('.', '_')}{suffix}"
 
             analysis, leads = process_single_domain(
-                domain, cfg, verbose, max_leads,
-                batch_export, show_email, batch_html,
+                domain,
+                cfg,
+                verbose,
+                max_leads,
+                batch_export,
+                show_email,
+                batch_html,
                 do_interactive=False,
             )
             if leads:
@@ -626,8 +651,8 @@ def main(domains, analyze_only, max_leads, export_file, html_file, serpapi_key,
         summ.add_column("Top Lead")
         for d, data in all_results.items():
             leads = data["leads"]
-            hot = sum(1 for l in leads if l.get("relevance_score", 0) >= 70)
-            with_email = sum(1 for l in leads if l.get("emails"))
+            hot = sum(1 for ld in leads if ld.get("relevance_score", 0) >= 70)
+            with_email = sum(1 for ld in leads if ld.get("emails"))
             top = leads[0].get("name", "—") if leads else "—"
             summ.add_row(d, str(len(leads)), str(hot), str(with_email), top)
         console.print(summ)
@@ -648,8 +673,14 @@ def main(domains, analyze_only, max_leads, export_file, html_file, serpapi_key,
     else:
         # Single domain
         process_single_domain(
-            domains[0], cfg, verbose, max_leads, export_file,
-            show_email, html_file, do_interactive=interactive,
+            domains[0],
+            cfg,
+            verbose,
+            max_leads,
+            export_file,
+            show_email,
+            html_file,
+            do_interactive=interactive,
         )
 
     console.print()

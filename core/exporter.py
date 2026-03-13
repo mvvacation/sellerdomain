@@ -9,10 +9,20 @@ def export_csv(leads, filepath, analysis=None):
     """Export leads to a CSV file."""
     filepath = Path(filepath)
     fieldnames = [
-        "rank", "name", "website", "relevance_score", "buyer_type",
-        "emails", "phone", "linkedin", "twitter",
-        "technologies", "description", "reasons",
-        "score_breakdown", "matched_queries",
+        "rank",
+        "name",
+        "website",
+        "relevance_score",
+        "buyer_type",
+        "emails",
+        "phone",
+        "linkedin",
+        "twitter",
+        "technologies",
+        "description",
+        "reasons",
+        "score_breakdown",
+        "matched_queries",
     ]
 
     with open(filepath, "w", newline="", encoding="utf-8") as f:
@@ -21,22 +31,24 @@ def export_csv(leads, filepath, analysis=None):
         for i, lead in enumerate(leads, 1):
             breakdown = lead.get("score_breakdown", {})
             bd_str = "; ".join(f"{k}={v}" for k, v in breakdown.items()) if breakdown else ""
-            writer.writerow({
-                "rank": i,
-                "name": lead.get("name", ""),
-                "website": lead.get("website", ""),
-                "relevance_score": lead.get("relevance_score", 0),
-                "buyer_type": lead.get("buyer_type", ""),
-                "emails": "; ".join(lead.get("emails", [])),
-                "phone": lead.get("phone", ""),
-                "linkedin": lead.get("social", {}).get("linkedin", ""),
-                "twitter": lead.get("social", {}).get("twitter", ""),
-                "technologies": "; ".join(lead.get("technologies", [])),
-                "description": lead.get("description", "") or lead.get("snippet", ""),
-                "reasons": " | ".join(lead.get("relevance_reasons", [])),
-                "score_breakdown": bd_str,
-                "matched_queries": "; ".join(lead.get("matched_queries", [])),
-            })
+            writer.writerow(
+                {
+                    "rank": i,
+                    "name": lead.get("name", ""),
+                    "website": lead.get("website", ""),
+                    "relevance_score": lead.get("relevance_score", 0),
+                    "buyer_type": lead.get("buyer_type", ""),
+                    "emails": "; ".join(lead.get("emails", [])),
+                    "phone": lead.get("phone", ""),
+                    "linkedin": lead.get("social", {}).get("linkedin", ""),
+                    "twitter": lead.get("social", {}).get("twitter", ""),
+                    "technologies": "; ".join(lead.get("technologies", [])),
+                    "description": lead.get("description", "") or lead.get("snippet", ""),
+                    "reasons": " | ".join(lead.get("relevance_reasons", [])),
+                    "score_breakdown": bd_str,
+                    "matched_queries": "; ".join(lead.get("matched_queries", [])),
+                }
+            )
 
     return str(filepath)
 

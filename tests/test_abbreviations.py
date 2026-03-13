@@ -1,7 +1,5 @@
 """Tests for abbreviation expansion logic."""
 
-import pytest
-
 from core.abbreviations import expand_abbreviations
 
 

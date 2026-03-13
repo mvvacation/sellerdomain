@@ -6,7 +6,6 @@ from pathlib import Path
 
 import yaml
 
-
 DEFAULT_CONFIG = {
     "search": {
         "engine": "auto",
@@ -46,7 +45,7 @@ class Config:
         self._load_env_overrides()
 
     def _load_file(self, path):
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             file_data = yaml.safe_load(f) or {}
         self._deep_merge(self.data, file_data)
 

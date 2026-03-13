@@ -1,7 +1,5 @@
 """Tests for lead scoring algorithm."""
 
-import pytest
-
 from core.lead_scorer import LeadScorer
 
 
@@ -123,8 +121,14 @@ class TestLeadScorer:
         scorer = LeadScorer(_make_analysis())
         lead = _make_lead()
         breakdown = scorer._score_breakdown(lead)
-        expected_keys = ["brand_fit", "content_match", "domain_gap",
-                         "discovery_depth", "actionability", "buyer_signals"]
+        expected_keys = [
+            "brand_fit",
+            "content_match",
+            "domain_gap",
+            "discovery_depth",
+            "actionability",
+            "buyer_signals",
+        ]
         for key in expected_keys:
             assert key in breakdown
 

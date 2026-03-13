@@ -2,11 +2,13 @@
 
 import hashlib
 import json
+import logging
 import os
 import tempfile
 import time
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
 
 CACHE_DIR = Path(".domainseller_cache")
 
@@ -42,7 +44,7 @@ class SearchCache:
                 return None
             return data.get("payload")
         except (json.JSONDecodeError, OSError, KeyError):
-            # Corrupted cache file — remove it
+            logger.debug("Corrupted cache file %s, removing", path)
             try:
                 path.unlink(missing_ok=True)
             except OSError:
@@ -63,18 +65,19 @@ class SearchCache:
                     json.dump(data, f, default=str)
                 os.replace(tmp_path, path)
             except Exception:
-                # Clean up temp file on failure
+                logger.debug("Failed to write cache file %s", path, exc_info=True)
                 try:
                     os.unlink(tmp_path)
                 except OSError:
                     pass
         except OSError:
-            pass
+            logger.debug("Failed to create temp cache file", exc_info=True)
 
     def clear(self):
         """Clear all cached data."""
         if CACHE_DIR.exists():
             import shutil
+
             shutil.rmtree(CACHE_DIR, ignore_errors=True)
             CACHE_DIR.mkdir(exist_ok=True)
 

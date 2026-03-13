@@ -4,12 +4,23 @@ import html
 from datetime import datetime
 
 
+def _safe_url(url):
+    """Sanitize URL for use in href attributes — block javascript: and data: URIs."""
+    url = url.strip()
+    lower = url.lower().lstrip()
+    if lower.startswith(("javascript:", "data:", "vbscript:")):
+        return "#"
+    if not lower.startswith(("http://", "https://", "mailto:", "/", "#")):
+        return "#"
+    return html.escape(url, quote=True)
+
+
 def generate_html_report(leads, analysis):
     """Generate a standalone HTML report with embedded CSS."""
     domain = analysis["domain"]
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    leads_html = ""
+    leads_parts = []
     for i, lead in enumerate(leads, 1):
         score = lead.get("relevance_score", 0)
         if score >= 70:
@@ -27,7 +38,6 @@ def generate_html_report(leads, analysis):
 
         score_bar_color = "#22c55e" if score >= 70 else "#eab308" if score >= 40 else "#94a3b8"
         name = html.escape(lead.get("name", "Unknown"))
-        website = html.escape(lead.get("website", ""))
         website_domain = html.escape(lead.get("website_domain", ""))
         desc = html.escape(lead.get("description", "") or lead.get("snippet", ""))
         if len(desc) > 200:
@@ -35,7 +45,9 @@ def generate_html_report(leads, analysis):
 
         emails_html = ""
         for email_addr in lead.get("emails", [])[:3]:
-            emails_html += f'<a href="mailto:{html.escape(email_addr)}" class="email-link">{html.escape(email_addr)}</a> '
+            emails_html += (
+                f'<a href="{_safe_url("mailto:" + email_addr)}" class="email-link">{html.escape(email_addr)}</a> '
+            )
 
         phone = html.escape(lead.get("phone", ""))
         phone_html = f'<span class="detail-value">{phone}</span>' if phone else ""
@@ -43,33 +55,41 @@ def generate_html_report(leads, analysis):
         social = lead.get("social", {})
         social_html = ""
         if social.get("linkedin"):
-            social_html += f'<a href="{html.escape(social["linkedin"])}" target="_blank" class="social-link li">LinkedIn</a> '
+            social_html += (
+                f'<a href="{_safe_url(social["linkedin"])}" target="_blank" class="social-link li">LinkedIn</a> '
+            )
         if social.get("twitter"):
-            social_html += f'<a href="{html.escape(social["twitter"])}" target="_blank" class="social-link tw">Twitter/X</a> '
+            social_html += (
+                f'<a href="{_safe_url(social["twitter"])}" target="_blank" class="social-link tw">Twitter/X</a> '
+            )
         if social.get("facebook"):
-            social_html += f'<a href="{html.escape(social["facebook"])}" target="_blank" class="social-link fb">Facebook</a> '
+            social_html += (
+                f'<a href="{_safe_url(social["facebook"])}" target="_blank" class="social-link fb">Facebook</a> '
+            )
 
         reasons = lead.get("relevance_reasons", [])
         reasons_html = ""
         for r in reasons[:3]:
-            reasons_html += f'<li>{html.escape(r)}</li>'
+            reasons_html += f"<li>{html.escape(r)}</li>"
 
         location = html.escape(lead.get("location", ""))
         employees = html.escape(lead.get("employee_count", ""))
         tech_html = ""
         techs = lead.get("technologies", [])
         if techs:
-            tech_html = '<div class="tech-tags">' + "".join(
-                f'<span class="tech-tag">{html.escape(t)}</span>' for t in techs[:8]
-            ) + '</div>'
+            tech_html = (
+                '<div class="tech-tags">'
+                + "".join(f'<span class="tech-tag">{html.escape(t)}</span>' for t in techs[:8])
+                + "</div>"
+            )
 
-        leads_html += f"""
+        leads_parts.append(f"""
         <div class="lead-card" data-score="{score}">
             <div class="lead-header">
                 <div class="lead-rank">#{i}</div>
                 <div class="lead-name-area">
                     <h3>{name}</h3>
-                    <a href="{website}" target="_blank" class="lead-website">{website_domain}</a>
+                    <a href="{_safe_url(lead.get("website", ""))}" target="_blank" class="lead-website">{website_domain}</a>
                 </div>
                 <div class="lead-score-area">
                     <span class="badge {badge_class}">{badge_text}</span>
@@ -89,15 +109,25 @@ def generate_html_report(leads, analysis):
                 {tech_html}
                 {"<div class='detail-row'><span class='detail-label'>Why relevant:</span><ul class='reasons'>" + reasons_html + "</ul></div>" if reasons_html else ""}
             </div>
-        </div>"""
+        </div>""")
 
-    # Analytics
+    leads_html = "".join(leads_parts)
+
+    # Analytics — single pass
     total = len(leads)
-    hot_count = sum(1 for l in leads if l.get("relevance_score", 0) >= 70)
-    warm_count = sum(1 for l in leads if 50 <= l.get("relevance_score", 0) < 70)
-    with_email = sum(1 for l in leads if l.get("emails"))
-    with_social = sum(1 for l in leads if l.get("social", {}).get("linkedin"))
-    avg_score = sum(l.get("relevance_score", 0) for l in leads) / max(1, total)
+    hot_count = warm_count = with_email = with_social = total_score = 0
+    for ld in leads:
+        score = ld.get("relevance_score", 0)
+        total_score += score
+        if score >= 70:
+            hot_count += 1
+        elif score >= 50:
+            warm_count += 1
+        if ld.get("emails"):
+            with_email += 1
+        if ld.get("social", {}).get("linkedin"):
+            with_social += 1
+    avg_score = total_score / max(1, total)
 
     val_low = analysis.get("estimated_value_low", 0)
     val_high = analysis.get("estimated_value_high", 0)
@@ -246,9 +276,9 @@ body {{ font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg);
         <h2>Domain Analysis</h2>
         <div class="analysis-grid">
             <div class="analysis-item"><span class="label">Domain:</span><span class="value">{html.escape(domain)}</span></div>
-            <div class="analysis-item"><span class="label">Keywords:</span><span class="value">{html.escape(', '.join(keywords))}</span></div>
-            <div class="analysis-item"><span class="label">Industries:</span><span class="value">{html.escape(', '.join(industries))}</span></div>
-            <div class="analysis-item"><span class="label">Domain Age:</span><span class="value">~{analysis.get('domain_age_years', 0)} years</span></div>
+            <div class="analysis-item"><span class="label">Keywords:</span><span class="value">{html.escape(", ".join(keywords))}</span></div>
+            <div class="analysis-item"><span class="label">Industries:</span><span class="value">{html.escape(", ".join(industries))}</span></div>
+            <div class="analysis-item"><span class="label">Domain Age:</span><span class="value">~{analysis.get("domain_age_years", 0)} years</span></div>
             <div class="analysis-item"><span class="label">Est. Value:</span><span class="value value-highlight">${val_low:,} – ${val_high:,}</span></div>
         </div>
     </div>
@@ -298,7 +328,6 @@ def _build_enrichment_html(analysis):
     sections = []
 
     # --- Interpretation / TLD Intelligence ---
-    interp_items = []
     tld_industry = analysis.get("tld_industry")
     tld_geo = analysis.get("tld_geo")
     niche = analysis.get("niche_context")
@@ -371,8 +400,10 @@ def _build_enrichment_html(analysis):
             d = html.escape(c.get("domain", ""))
             p = c.get("price", 0)
             s = html.escape(c.get("source", ""))
-            u = html.escape(c.get("url", ""))
-            rows += f'<tr><td>{d}</td><td class="price">${p:,.0f}</td><td><a href="{u}" target="_blank">{s}</a></td></tr>'
+            u = _safe_url(c.get("url", ""))
+            rows += (
+                f'<tr><td>{d}</td><td class="price">${p:,.0f}</td><td><a href="{u}" target="_blank">{s}</a></td></tr>'
+            )
 
         summary = html.escape(market.get("market_summary", ""))
         pr = market.get("price_range", {})
@@ -380,14 +411,14 @@ def _build_enrichment_html(analysis):
         if pr:
             range_html = (
                 f'<p style="color:var(--green);font-size:0.95rem;font-weight:600;margin-bottom:0.5rem;">'
-                f'${pr.get("low", 0):,.0f} — ${pr.get("high", 0):,.0f} '
-                f'(median ${pr.get("median", 0):,.0f}, {pr.get("count", 0)} comps)</p>'
+                f"${pr.get('low', 0):,.0f} — ${pr.get('high', 0):,.0f} "
+                f"(median ${pr.get('median', 0):,.0f}, {pr.get('count', 0)} comps)</p>"
             )
         sections.append(
             f'<div class="enrich-panel"><h2 class="market">💰 Market Comparables</h2>'
-            f'{range_html}'
+            f"{range_html}"
             f'<table class="comp-table"><thead><tr><th>Domain</th><th>Price</th><th>Source</th></tr></thead>'
-            f'<tbody>{rows}</tbody></table>'
+            f"<tbody>{rows}</tbody></table>"
             f'<p style="color:var(--muted);font-size:0.85rem;margin-top:0.75rem;">{summary}</p></div>'
         )
 

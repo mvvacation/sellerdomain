@@ -7,11 +7,27 @@ import tldextract
 
 # TLD desirability tiers (lower = they'd want to upgrade more)
 _TLD_TIER = {
-    "com": 5, "org": 4, "net": 4,
-    "co": 3, "io": 3, "ai": 4, "app": 3, "dev": 3,
-    "tech": 2, "us": 2, "me": 2, "tv": 2,
-    "xyz": 1, "info": 1, "biz": 1, "online": 1, "site": 1,
-    "store": 2, "club": 1, "space": 1, "website": 1,
+    "com": 5,
+    "org": 4,
+    "net": 4,
+    "co": 3,
+    "io": 3,
+    "ai": 4,
+    "app": 3,
+    "dev": 3,
+    "tech": 2,
+    "us": 2,
+    "me": 2,
+    "tv": 2,
+    "xyz": 1,
+    "info": 1,
+    "biz": 1,
+    "online": 1,
+    "site": 1,
+    "store": 2,
+    "club": 1,
+    "space": 1,
+    "website": 1,
 }
 
 # Funding-related keywords in descriptions
@@ -39,9 +55,7 @@ _GROWTH_SIGNALS = re.compile(
 )
 
 # Company size keywords
-_TEAM_SIZE_RE = re.compile(
-    r"(\d{1,5})\+?\s*(?:employees?|team members?|people|staff|engineers?)", re.I
-)
+_TEAM_SIZE_RE = re.compile(r"(\d{1,5})\+?\s*(?:employees?|team members?|people|staff|engineers?)", re.I)
 
 
 class LeadScorer:
@@ -83,12 +97,12 @@ class LeadScorer:
 
     def _score_breakdown(self, lead):
         return {
-            "brand_fit":       self._brand_fit(lead),
-            "content_match":   self._content_match(lead),
-            "domain_gap":      self._domain_gap(lead),
+            "brand_fit": self._brand_fit(lead),
+            "content_match": self._content_match(lead),
+            "domain_gap": self._domain_gap(lead),
             "discovery_depth": self._discovery_depth(lead),
-            "actionability":   self._actionability(lead),
-            "buyer_signals":   self._buyer_signals(lead),
+            "actionability": self._actionability(lead),
+            "buyer_signals": self._buyer_signals(lead),
         }
 
     def _brand_fit(self, lead):
@@ -118,10 +132,14 @@ class LeadScorer:
     def _content_match(self, lead):
         """How relevant the lead's content is to our domain. Max 18."""
         pts = 0
-        text = " ".join([
-            lead.get("title", ""), lead.get("snippet", ""),
-            lead.get("description", ""), lead.get("location", ""),
-        ]).lower()
+        text = " ".join(
+            [
+                lead.get("title", ""),
+                lead.get("snippet", ""),
+                lead.get("description", ""),
+                lead.get("location", ""),
+            ]
+        ).lower()
         if not text.strip():
             return 0
 
@@ -227,10 +245,13 @@ class LeadScorer:
     def _buyer_signals(self, lead):
         """Indirect buying-intent signals. Max 14."""
         pts = 0
-        text = " ".join([
-            lead.get("title", ""), lead.get("snippet", ""),
-            lead.get("description", ""),
-        ]).lower()
+        text = " ".join(
+            [
+                lead.get("title", ""),
+                lead.get("snippet", ""),
+                lead.get("description", ""),
+            ]
+        ).lower()
 
         # Funded startup → has money to spend
         if _FUNDING_SIGNALS.search(text):
@@ -300,10 +321,13 @@ class LeadScorer:
         cdomain = ext.domain.lower()
         ctld = ext.suffix
         name_lower = lead.get("name", "").lower()
-        text = " ".join([
-            lead.get("title", ""), lead.get("snippet", ""),
-            lead.get("description", ""),
-        ]).lower()
+        text = " ".join(
+            [
+                lead.get("title", ""),
+                lead.get("snippet", ""),
+                lead.get("description", ""),
+            ]
+        ).lower()
 
         # Brand fit reasons
         if self.domain_name == cdomain:
@@ -354,8 +378,7 @@ class LeadScorer:
 
         # Actionability
         if lead.get("emails"):
-            on_domain = any(e.split("@")[-1].lower() == lead.get("website_domain", "").lower()
-                            for e in lead["emails"])
+            on_domain = any(e.split("@")[-1].lower() == lead.get("website_domain", "").lower() for e in lead["emails"])
             if on_domain:
                 reasons.append("Direct company email available")
 

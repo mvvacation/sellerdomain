@@ -2,7 +2,7 @@
 
 import pytest
 
-from core.validators import validate_domain, validate_config_values, ValidationError
+from core.validators import ValidationError, validate_config_values, validate_domain
 
 
 class TestValidateDomain:

@@ -6,9 +6,8 @@ from urllib3.util.retry import Retry
 
 # Identify ourselves honestly as a research tool
 USER_AGENT = (
-    "DomainSeller/2.1 (domain research tool; +https://github.com/sellerdomain) "
-    "Python-Requests/{ver}"
-).format(ver=requests.__version__)
+    f"DomainSeller/2.1 (domain research tool; +https://github.com/sellerdomain) Python-Requests/{requests.__version__}"
+)
 
 # Default retry configuration
 DEFAULT_RETRIES = 3
@@ -25,11 +24,13 @@ def create_session(
 ) -> requests.Session:
     """Create a requests session with retry logic and connection pooling."""
     session = requests.Session()
-    session.headers.update({
-        "User-Agent": user_agent,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
-    })
+    session.headers.update(
+        {
+            "User-Agent": user_agent,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+        }
+    )
 
     retry_strategy = Retry(
         total=retries,

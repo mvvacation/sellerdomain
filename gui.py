@@ -4,6 +4,7 @@
 import csv
 import io
 import json
+import logging
 import os
 import queue
 import re
@@ -13,6 +14,8 @@ import uuid
 import webbrowser
 from datetime import datetime, date
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 _tasks_lock = threading.Lock()
 
@@ -216,8 +219,10 @@ def api_export(tid, fmt):
 
 
 def _run_pipeline(tid, domain):
-    q = tasks[tid]["q"]
-    res = tasks[tid]["results"]
+    with _tasks_lock:
+        task = tasks[tid]
+    q = task["q"]
+    res = task["results"]
 
     try:
         q.put({"type": "step", "step": "analysis", "msg": f"Analyzing {domain}..."})
@@ -226,23 +231,46 @@ def _run_pipeline(tid, domain):
         res["analysis"] = ca
         q.put({"type": "analysis_done", "data": ca})
 
-        # Wayback Machine history check
-        q.put({"type": "progress", "step": "analysis", "msg": "Checking domain history (Wayback Machine)..."})
-        history = check_domain_history(domain)
+        # Enrichment: history, social handles, market comps — run concurrently
+        q.put({"type": "progress", "step": "analysis", "msg": "Checking domain history, social handles, and market comparables..."})
+
+        enrichment_results = {}
+
+        def _fetch_history():
+            return check_domain_history(domain)
+
+        def _fetch_social():
+            return check_social_handles(analysis["name"])
+
+        def _fetch_market():
+            return find_comparable_sales(analysis["name"], analysis["tld"], analysis["keywords"])
+
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        enrichment_tasks = {
+            "history": _fetch_history,
+            "social": _fetch_social,
+            "market": _fetch_market,
+        }
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = {executor.submit(fn): name for name, fn in enrichment_tasks.items()}
+            for future in as_completed(futures):
+                name = futures[future]
+                try:
+                    enrichment_results[name] = future.result()
+                except Exception:
+                    enrichment_results[name] = {}
+
+        history = enrichment_results.get("history", {})
         ca["history"] = _jsonable(history)
         analysis["history"] = history
         q.put({"type": "progress", "step": "analysis", "msg": f"History: {history.get('total_snapshots', 0)} snapshots found"})
 
-        # Social handle availability
-        q.put({"type": "progress", "step": "analysis", "msg": "Checking social media handles..."})
-        social = check_social_handles(analysis["name"])
+        social = enrichment_results.get("social", {})
         ca["social_handles"] = _jsonable(social)
         analysis["social_handles"] = social
         q.put({"type": "progress", "step": "analysis", "msg": social.get("summary", "")})
 
-        # Marketplace price comparison
-        q.put({"type": "progress", "step": "analysis", "msg": "Searching marketplace comparables..."})
-        market = find_comparable_sales(analysis["name"], analysis["tld"], analysis["keywords"])
+        market = enrichment_results.get("market", {})
         ca["market_comp"] = _jsonable(market)
         analysis["market_comp"] = market
         q.put({"type": "progress", "step": "analysis", "msg": market.get("market_summary", "")})
@@ -276,10 +304,10 @@ def _run_pipeline(tid, domain):
             "buyer_types": _count_buyer_types(scored),
         })
     except Exception as exc:
-        import traceback
-        traceback.print_exc()
+        logger.exception("Pipeline error for %s", domain)
         q.put({"type": "error", "msg": str(exc)})
-    tasks[tid]["status"] = "done"
+    with _tasks_lock:
+        tasks[tid]["status"] = "done"
 
 
 def _count_buyer_types(leads):

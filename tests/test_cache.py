@@ -5,7 +5,7 @@ import time
 
 import pytest
 
-from core.cache import SearchCache, CACHE_DIR
+from core.cache import SearchCache
 
 
 @pytest.fixture(autouse=True)

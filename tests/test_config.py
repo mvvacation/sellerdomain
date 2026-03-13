@@ -1,9 +1,8 @@
 """Tests for configuration management."""
 
-import pytest
 import yaml
 
-from core.config import Config, DEFAULT_CONFIG
+from core.config import Config
 
 
 class TestConfig:
@@ -23,9 +22,13 @@ class TestConfig:
 
     def test_load_from_file(self, tmp_path):
         config_file = tmp_path / "config.yaml"
-        config_file.write_text(yaml.dump({
-            "search": {"engine": "ddgs", "max_results_per_query": 5},
-        }))
+        config_file.write_text(
+            yaml.dump(
+                {
+                    "search": {"engine": "ddgs", "max_results_per_query": 5},
+                }
+            )
+        )
         cfg = Config(str(config_file))
         assert cfg.get("search", "engine") == "ddgs"
         assert cfg.get("search", "max_results_per_query") == 5
@@ -34,9 +37,13 @@ class TestConfig:
 
     def test_deep_merge(self, tmp_path):
         config_file = tmp_path / "config.yaml"
-        config_file.write_text(yaml.dump({
-            "search": {"engine": "serpapi"},
-        }))
+        config_file.write_text(
+            yaml.dump(
+                {
+                    "search": {"engine": "serpapi"},
+                }
+            )
+        )
         cfg = Config(str(config_file))
         # engine overridden
         assert cfg.get("search", "engine") == "serpapi"

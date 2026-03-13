@@ -1,11 +1,12 @@
 """Domain history via Wayback Machine — checks archive.org for past usage."""
 
-import re
-from datetime import datetime
+import logging
 
 from bs4 import BeautifulSoup
 
 from core.http_utils import create_session, safe_get
+
+logger = logging.getLogger(__name__)
 
 _TIMEOUT = 20
 
@@ -36,11 +37,17 @@ def check_domain_history(domain):
     cdx_url = "https://web.archive.org/cdx/search/cdx"
 
     try:
-        resp = session.get(cdx_url, params={
-            "url": domain, "output": "json", "fl": "timestamp",
-            "collapse": "timestamp:4",  # yearly collapse
-            "limit": 500,
-        }, timeout=_TIMEOUT)
+        resp = session.get(
+            cdx_url,
+            params={
+                "url": domain,
+                "output": "json",
+                "fl": "timestamp",
+                "collapse": "timestamp:4",  # yearly collapse
+                "limit": 500,
+            },
+            timeout=_TIMEOUT,
+        )
         if resp.status_code == 200:
             rows = resp.json()
             if len(rows) > 1:
@@ -53,7 +60,7 @@ def check_domain_history(domain):
                 last_year = int(timestamps[-1][:4])
                 result["years_active"] = max(1, last_year - first_year + 1)
     except Exception:
-        pass
+        logger.debug("Failed to query Wayback Machine CDX for %s", domain, exc_info=True)
     finally:
         session.close()
 
@@ -88,20 +95,26 @@ def _classify_last_snapshot(domain):
         if soup.title and soup.title.string:
             title = soup.title.string.strip()[:200]
 
-        desc = ""
-        meta = soup.find("meta", attrs={"name": "description"})
-        if meta and meta.get("content"):
-            desc = meta["content"].strip()[:300]
-
         # Check for parking / for-sale signals
         body_text = soup.get_text(" ", strip=True)[:3000].lower()
 
         parking_signals = [
-            "domain is for sale", "buy this domain", "domain may be for sale",
-            "this domain is parked", "godaddy", "afternic", "sedo",
-            "dan.com", "hugedomains", "domain parking", "under construction",
-            "coming soon", "future home", "this page is parked",
-            "inquire about this domain", "make an offer",
+            "domain is for sale",
+            "buy this domain",
+            "domain may be for sale",
+            "this domain is parked",
+            "godaddy",
+            "afternic",
+            "sedo",
+            "dan.com",
+            "hugedomains",
+            "domain parking",
+            "under construction",
+            "coming soon",
+            "future home",
+            "this page is parked",
+            "inquire about this domain",
+            "make an offer",
         ]
         is_parked = any(sig in body_text for sig in parking_signals)
 
@@ -127,11 +140,11 @@ def _classify_last_snapshot(domain):
             if matches >= 2:
                 summary = cat
                 if title:
-                    summary += f" — \"{title[:80]}\""
+                    summary += f' — "{title[:80]}"'
                 return summary
 
         if title:
-            return f"Active site — \"{title[:100]}\""
+            return f'Active site — "{title[:100]}"'
         return "Active site (content detected)"
 
     except Exception:
