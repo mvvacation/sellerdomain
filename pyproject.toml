@@ -1,0 +1,35 @@
+[project]
+name = "domain-seller"
+version = "2.1.0"
+description = "Find real buyers for your domain names using live data"
+requires-python = ">=3.8"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-v --tb=short"
+
+[tool.ruff]
+target-version = "py38"
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "UP",   # pyupgrade
+    "S",    # flake8-bandit (security)
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "S101",   # use of assert (needed in tests)
+    "S603",   # subprocess calls (not applicable)
+    "S607",   # start process with partial path
+    "B905",   # zip strict (py3.10+)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S"]

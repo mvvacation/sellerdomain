@@ -28,7 +28,7 @@ def export_csv(leads, filepath, analysis=None):
                 "relevance_score": lead.get("relevance_score", 0),
                 "buyer_type": lead.get("buyer_type", ""),
                 "emails": "; ".join(lead.get("emails", [])),
-                "phone": "; ".join(lead.get("phones", [])) if lead.get("phones") else "",
+                "phone": lead.get("phone", ""),
                 "linkedin": lead.get("social", {}).get("linkedin", ""),
                 "twitter": lead.get("social", {}).get("twitter", ""),
                 "technologies": "; ".join(lead.get("technologies", [])),

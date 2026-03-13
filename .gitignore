@@ -39,3 +39,8 @@ output/
 # Environment variables
 .env
 .env.*
+
+# Test artifacts
+.pytest_cache/
+htmlcov/
+.coverage

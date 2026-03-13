@@ -25,6 +25,7 @@ from core.outreach import generate_outreach_email, generate_all_templates
 from core.history import check_domain_history
 from core.social_checker import check_social_handles
 from core.market_comp import find_comparable_sales
+from core.validators import validate_domain, ValidationError
 
 console = Console()
 
@@ -527,6 +528,16 @@ def main(domains, analyze_only, max_leads, export_file, html_file, serpapi_key,
     DOMAINS: One or more domain names to sell (e.g., healthtrack.com cloudpay.io)
     """
     print_banner()
+
+    # Validate all domains upfront
+    validated_domains = []
+    for d in domains:
+        try:
+            validated_domains.append(validate_domain(d))
+        except ValidationError as e:
+            console.print(f"[bold red]Invalid domain '{d}':[/] {e}")
+            return
+    domains = tuple(validated_domains)
 
     # Load config
     cfg = Config(config_path if config_path else None)

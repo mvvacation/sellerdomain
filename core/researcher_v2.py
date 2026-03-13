@@ -3,16 +3,15 @@
 import json as _json
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urlparse
 
 import dns.resolver
-import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 import tldextract
 from bs4 import BeautifulSoup
 
 from core.cache import SearchCache
+from core.http_utils import create_session, safe_get, USER_AGENT
 
 try:
     from ddgs import DDGS
@@ -76,10 +75,7 @@ SKIP_DOMAINS = {
     "myfitnesspal.com", "ouraring.com", "whoop.com", "fitbit.com",
 }
 
-USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-)
+# USER_AGENT imported from http_utils
 
 EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
 
@@ -123,9 +119,6 @@ TECH_PATTERNS = {
 class BuyerResearcher:
     """Enhanced buyer researcher with retry logic, caching, contact discovery, and deep enrichment."""
 
-    _MAX_HTTP_RETRIES = 3
-    _BACKOFF_FACTOR = 0.5
-
     def __init__(self, config, analysis, progress_callback=None):
         self.config = config
         self.analysis = analysis
@@ -138,18 +131,7 @@ class BuyerResearcher:
         self.niche_context = analysis.get("niche_context", "")
         self.progress = progress_callback or (lambda msg, **kw: None)
 
-        # --- Robust session with retry adapter ---
-        self._session = requests.Session()
-        self._session.headers.update({"User-Agent": USER_AGENT})
-        retry_strategy = Retry(
-            total=self._MAX_HTTP_RETRIES,
-            backoff_factor=self._BACKOFF_FACTOR,
-            status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=["GET", "HEAD"],
-        )
-        adapter = HTTPAdapter(max_retries=retry_strategy, pool_maxsize=10, pool_connections=10)
-        self._session.mount("https://", adapter)
-        self._session.mount("http://", adapter)
+        self._session = create_session(retries=3, backoff_factor=0.5, pool_size=10)
 
         self.cache = SearchCache(
             enabled=config.get("cache", "enabled", default=True),
@@ -160,12 +142,7 @@ class BuyerResearcher:
 
     def _safe_get(self, url, timeout=10, **kwargs):
         """GET with graceful degradation — returns None on failure."""
-        try:
-            resp = self._session.get(url, timeout=timeout, allow_redirects=True, **kwargs)
-            resp.raise_for_status()
-            return resp
-        except requests.RequestException:
-            return None
+        return safe_get(self._session, url, timeout=timeout, **kwargs)
 
     def research(self):
         """Run the full buyer research pipeline. Returns list of lead dicts."""
@@ -548,10 +525,12 @@ class BuyerResearcher:
         return list(companies.values())
 
     def _enrich_companies(self, companies):
-        """Enrich company data by visiting their websites — deeper scraping with retry."""
+        """Enrich company data by visiting their websites — concurrent with retry."""
         timeout = self.config.get("enrichment", "request_timeout", default=10)
-        enriched = []
 
+        # Separate cached from uncached
+        enriched = []
+        to_scrape = []
         for idx, company in enumerate(companies):
             domain_key = company["website_domain"]
             cached = self.cache.get("enrich", domain_key)
@@ -559,132 +538,158 @@ class BuyerResearcher:
                 company.update(cached)
                 enriched.append(company)
                 self.progress(f"    {domain_key} [cached]", step="enrich", current=idx + 1)
-                continue
+            else:
+                to_scrape.append(company)
 
-            self.progress(f"    Scraping {domain_key}...", step="enrich", current=idx + 1)
-            enrichment_data = {}
-
-            resp = self._safe_get(company["website"], timeout=timeout)
-            if resp is not None:
-                html_text = resp.text
-                soup = BeautifulSoup(html_text, "lxml")
-
-                # --- Title ---
-                if soup.title and soup.title.string:
-                    enrichment_data["meta_title"] = soup.title.string.strip()[:200]
-
-                # --- Meta description ---
-                meta = soup.find("meta", attrs={"name": "description"})
-                if meta and meta.get("content"):
-                    enrichment_data["description"] = meta["content"].strip()[:500]
-
-                # --- OG metadata ---
-                og_desc = soup.find("meta", attrs={"property": "og:description"})
-                if og_desc and og_desc.get("content") and not enrichment_data.get("description"):
-                    enrichment_data["description"] = og_desc["content"].strip()[:500]
-
-                # --- Emails ---
-                page_emails = set(EMAIL_RE.findall(html_text))
-                good_emails = []
-                for email_addr in page_emails:
-                    prefix = email_addr.split("@")[0].lower()
-                    email_domain = email_addr.split("@")[1].lower()
-                    tld_part = email_domain.rsplit(".", 1)[-1]
-                    if prefix in JUNK_EMAIL_PREFIXES:
-                        continue
-                    if tld_part in _FAKE_EMAIL_TLDS:
-                        continue
-                    if ".." in email_domain:
-                        continue
-                    if email_domain == domain_key or email_domain.endswith("." + domain_key):
-                        good_emails.insert(0, email_addr)
-                    else:
-                        good_emails.append(email_addr)
-                enrichment_data["emails"] = good_emails[:5]
-
-                # --- Phone numbers ---
-                phones = PHONE_RE.findall(html_text)
-                if phones:
-                    valid_phones = [p.strip() for p in phones
-                                    if len(re.sub(r'\D', '', p)) >= 10]
-                    if valid_phones:
-                        enrichment_data["phone"] = valid_phones[0]
-
-                # --- Social links ---
-                social = {}
-                for a_tag in soup.find_all("a", href=True):
-                    href = a_tag["href"].lower()
-                    if "linkedin.com/company" in href or "linkedin.com/in/" in href:
-                        social["linkedin"] = a_tag["href"]
-                    elif "twitter.com/" in href or "x.com/" in href:
-                        if not any(skip in href for skip in ["/share", "/intent", "/widgets"]):
-                            social["twitter"] = a_tag["href"]
-                    elif "facebook.com/" in href:
-                        if not any(skip in href for skip in ["/sharer", "/share", "/plugins"]):
-                            social["facebook"] = a_tag["href"]
-                enrichment_data["social"] = social
-
-                # --- Location ---
-                location = self._extract_location(soup, html_text)
-                if location:
-                    enrichment_data["location"] = location
-
-                # --- Technology detection ---
-                techs = self._detect_technologies(html_text, resp.headers)
-                if techs:
-                    enrichment_data["technologies"] = techs
-
-                # --- Company name from title ---
-                title_text = enrichment_data.get("meta_title", "")
-                if title_text:
-                    title_parts = re.split(r"\s*[\|–\-—:]\s*", title_text)
-                    if title_parts:
-                        candidate = title_parts[0].strip()
-                        if 2 < len(candidate) < 60:
-                            enrichment_data["name"] = candidate
-
-                # --- /about page ---
-                about_resp = self._safe_get(f"https://{domain_key}/about", timeout=5)
-                if about_resp and len(about_resp.text) > 500:
-                    about_soup = BeautifulSoup(about_resp.text, "lxml")
-                    about_meta = about_soup.find("meta", attrs={"name": "description"})
-                    if about_meta and about_meta.get("content"):
-                        about_desc = about_meta["content"].strip()[:500]
-                        if len(about_desc) > len(enrichment_data.get("description", "")):
-                            enrichment_data["description"] = about_desc
-                    about_emails = set(EMAIL_RE.findall(about_resp.text))
-                    for e in about_emails:
-                        p = e.split("@")[0].lower()
-                        ed = e.split("@")[1].lower()
-                        tld_part = ed.rsplit(".", 1)[-1]
-                        if p not in JUNK_EMAIL_PREFIXES and tld_part not in _FAKE_EMAIL_TLDS and ".." not in ed and ed == domain_key:
-                            if e not in enrichment_data.get("emails", []):
-                                enrichment_data.setdefault("emails", []).append(e)
-
-                # --- /contact page ---
-                contact_resp = self._safe_get(f"https://{domain_key}/contact", timeout=5)
-                if contact_resp:
-                    contact_emails = set(EMAIL_RE.findall(contact_resp.text))
-                    for e in contact_emails:
-                        p = e.split("@")[0].lower()
-                        ed = e.split("@")[1].lower()
-                        tld_part = ed.rsplit(".", 1)[-1]
-                        if p not in JUNK_EMAIL_PREFIXES and tld_part not in _FAKE_EMAIL_TLDS and ".." not in ed and ed == domain_key:
-                            if e not in enrichment_data.get("emails", []):
-                                enrichment_data.setdefault("emails", []).append(e)
-                    contact_phones = PHONE_RE.findall(contact_resp.text)
-                    if contact_phones and not enrichment_data.get("phone"):
-                        valid = [p.strip() for p in contact_phones
-                                 if len(re.sub(r'\D', '', p)) >= 10]
-                        if valid:
-                            enrichment_data["phone"] = valid[0]
-
-            company.update(enrichment_data)
-            self.cache.set("enrich", domain_key, enrichment_data)
-            enriched.append(company)
-            time.sleep(0.3)
+        # Scrape uncached companies concurrently (max 5 workers to be polite)
+        if to_scrape:
+            workers = min(5, len(to_scrape))
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                futures = {
+                    executor.submit(self._enrich_single, company, timeout): company
+                    for company in to_scrape
+                }
+                for idx, future in enumerate(as_completed(futures)):
+                    company = futures[future]
+                    try:
+                        enrichment_data = future.result()
+                        company.update(enrichment_data)
+                        self.cache.set("enrich", company["website_domain"], enrichment_data)
+                    except Exception:
+                        pass
+                    enriched.append(company)
+                    self.progress(
+                        f"    {company['website_domain']}",
+                        step="enrich",
+                        current=len(enriched),
+                    )
 
         return enriched
+
+    def _enrich_single(self, company, timeout):
+        """Enrich a single company — runs in thread pool."""
+        domain_key = company["website_domain"]
+        enrichment_data = {}
+
+        resp = self._safe_get(company["website"], timeout=timeout)
+        if resp is not None:
+            html_text = resp.text
+            soup = BeautifulSoup(html_text, "lxml")
+
+            # --- Title ---
+            if soup.title and soup.title.string:
+                enrichment_data["meta_title"] = soup.title.string.strip()[:200]
+
+            # --- Meta description ---
+            meta = soup.find("meta", attrs={"name": "description"})
+            if meta and meta.get("content"):
+                enrichment_data["description"] = meta["content"].strip()[:500]
+
+            # --- OG metadata ---
+            og_desc = soup.find("meta", attrs={"property": "og:description"})
+            if og_desc and og_desc.get("content") and not enrichment_data.get("description"):
+                enrichment_data["description"] = og_desc["content"].strip()[:500]
+
+            # --- Emails ---
+            enrichment_data["emails"] = self._extract_emails(html_text, domain_key)
+
+            # --- Phone numbers ---
+            phones = PHONE_RE.findall(html_text)
+            if phones:
+                valid_phones = [p.strip() for p in phones
+                                if len(re.sub(r'\D', '', p)) >= 10]
+                if valid_phones:
+                    enrichment_data["phone"] = valid_phones[0]
+
+            # --- Social links ---
+            social = {}
+            for a_tag in soup.find_all("a", href=True):
+                href = a_tag["href"].lower()
+                if "linkedin.com/company" in href or "linkedin.com/in/" in href:
+                    social["linkedin"] = a_tag["href"]
+                elif "twitter.com/" in href or "x.com/" in href:
+                    if not any(skip in href for skip in ["/share", "/intent", "/widgets"]):
+                        social["twitter"] = a_tag["href"]
+                elif "facebook.com/" in href:
+                    if not any(skip in href for skip in ["/sharer", "/share", "/plugins"]):
+                        social["facebook"] = a_tag["href"]
+            enrichment_data["social"] = social
+
+            # --- Location ---
+            location = self._extract_location(soup, html_text)
+            if location:
+                enrichment_data["location"] = location
+
+            # --- Technology detection ---
+            techs = self._detect_technologies(html_text, resp.headers)
+            if techs:
+                enrichment_data["technologies"] = techs
+
+            # --- Company name from title ---
+            title_text = enrichment_data.get("meta_title", "")
+            if title_text:
+                title_parts = re.split(r"\s*[\|–\-—:]\s*", title_text)
+                if title_parts:
+                    candidate = title_parts[0].strip()
+                    if 2 < len(candidate) < 60:
+                        enrichment_data["name"] = candidate
+
+            # --- /about page ---
+            about_resp = self._safe_get(f"https://{domain_key}/about", timeout=5)
+            if about_resp and len(about_resp.text) > 500:
+                about_soup = BeautifulSoup(about_resp.text, "lxml")
+                about_meta = about_soup.find("meta", attrs={"name": "description"})
+                if about_meta and about_meta.get("content"):
+                    about_desc = about_meta["content"].strip()[:500]
+                    if len(about_desc) > len(enrichment_data.get("description", "")):
+                        enrichment_data["description"] = about_desc
+                self._merge_emails(enrichment_data, about_resp.text, domain_key)
+
+            # --- /contact page ---
+            contact_resp = self._safe_get(f"https://{domain_key}/contact", timeout=5)
+            if contact_resp:
+                self._merge_emails(enrichment_data, contact_resp.text, domain_key)
+                if not enrichment_data.get("phone"):
+                    contact_phones = PHONE_RE.findall(contact_resp.text)
+                    valid = [p.strip() for p in contact_phones
+                             if len(re.sub(r'\D', '', p)) >= 10]
+                    if valid:
+                        enrichment_data["phone"] = valid[0]
+
+        return enrichment_data
+
+    def _extract_emails(self, html_text, domain_key):
+        """Extract and validate emails from HTML text."""
+        page_emails = set(EMAIL_RE.findall(html_text))
+        good_emails = []
+        for email_addr in page_emails:
+            prefix = email_addr.split("@")[0].lower()
+            email_domain = email_addr.split("@")[1].lower()
+            tld_part = email_domain.rsplit(".", 1)[-1]
+            if prefix in JUNK_EMAIL_PREFIXES:
+                continue
+            if tld_part in _FAKE_EMAIL_TLDS:
+                continue
+            if ".." in email_domain:
+                continue
+            if email_domain == domain_key or email_domain.endswith("." + domain_key):
+                good_emails.insert(0, email_addr)
+            else:
+                good_emails.append(email_addr)
+        return good_emails[:5]
+
+    def _merge_emails(self, enrichment_data, html_text, domain_key):
+        """Extract emails from HTML and merge into enrichment_data."""
+        found = set(EMAIL_RE.findall(html_text))
+        existing = enrichment_data.get("emails", [])
+        for e in found:
+            p = e.split("@")[0].lower()
+            ed = e.split("@")[1].lower()
+            tld_part = ed.rsplit(".", 1)[-1]
+            if (p not in JUNK_EMAIL_PREFIXES and tld_part not in _FAKE_EMAIL_TLDS
+                    and ".." not in ed and ed == domain_key and e not in existing):
+                existing.append(e)
+        enrichment_data["emails"] = existing
 
     def _extract_location(self, soup, html_text):
         """Try to extract company location from structured data or page content."""
@@ -745,6 +750,13 @@ class BuyerResearcher:
 
         return list(set(techs))
 
+    def _dns_resolve(self, domain, rtype="A"):
+        """DNS resolve with timeout."""
+        resolver = dns.resolver.Resolver()
+        resolver.timeout = 3
+        resolver.lifetime = 5
+        return resolver.resolve(domain, rtype)
+
     def _check_similar_domains(self):
         """Check who owns similar domain names across TLDs."""
         name = self.analysis["name"]
@@ -765,7 +777,7 @@ class BuyerResearcher:
 
             try:
                 try:
-                    dns.resolver.resolve(alt_domain, "A")
+                    self._dns_resolve(alt_domain, "A")
                 except Exception:
                     self.cache.set("similar", alt_domain, {})
                     continue
@@ -841,7 +853,7 @@ class BuyerResearcher:
                 continue
 
             try:
-                dns.resolver.resolve(var_domain, "A")
+                self._dns_resolve(var_domain, "A")
             except Exception:
                 self.cache.set("variation", var_domain, {})
                 continue
@@ -904,7 +916,7 @@ class BuyerResearcher:
 
             # Check if domain has MX records (accepts email)
             try:
-                dns.resolver.resolve(domain_key, "MX")
+                self._dns_resolve(domain_key, "MX")
             except Exception:
                 continue
 

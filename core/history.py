@@ -3,12 +3,11 @@
 import re
 from datetime import datetime
 
-import requests
 from bs4 import BeautifulSoup
 
+from core.http_utils import create_session, safe_get
 
 _TIMEOUT = 20
-_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 
 
 def check_domain_history(domain):
@@ -31,10 +30,10 @@ def check_domain_history(domain):
         "has_history": False,
     }
 
+    session = create_session(retries=2, backoff_factor=1.0)
+
     # 1 — CDX API: single query with yearly collapse to get date range + count
     cdx_url = "https://web.archive.org/cdx/search/cdx"
-    session = requests.Session()
-    session.headers.update({"User-Agent": _UA})
 
     try:
         resp = session.get(cdx_url, params={
@@ -55,6 +54,8 @@ def check_domain_history(domain):
                 result["years_active"] = max(1, last_year - first_year + 1)
     except Exception:
         pass
+    finally:
+        session.close()
 
     # 2 — Grab the most recent snapshot to classify past usage
     if result["has_history"]:
@@ -73,11 +74,11 @@ def _parse_ts(ts):
 
 def _classify_last_snapshot(domain):
     """Fetch the latest Wayback snapshot and classify the site's purpose."""
+    session = create_session(retries=1, backoff_factor=0.5)
     try:
         api_url = f"https://web.archive.org/web/2/{domain}"
-        resp = requests.get(api_url, timeout=_TIMEOUT, headers={"User-Agent": _UA},
-                            allow_redirects=True)
-        if resp.status_code != 200:
+        resp = safe_get(session, api_url, timeout=_TIMEOUT)
+        if resp is None:
             return ""
 
         text = resp.text[:30000]  # limit parsing size
@@ -135,3 +136,5 @@ def _classify_last_snapshot(domain):
 
     except Exception:
         return ""
+    finally:
+        session.close()

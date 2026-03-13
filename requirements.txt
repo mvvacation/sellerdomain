@@ -19,3 +19,8 @@ ddgs>=9.0.0
 # Optional: SerpAPI for more reliable search (requires API key from serpapi.com)
 # Uncomment if you have a SerpAPI key:
 # google-search-results>=2.4.0
+
+# Development / testing
+# pytest>=7.0.0
+# pytest-cov>=4.0.0
+# ruff>=0.1.0

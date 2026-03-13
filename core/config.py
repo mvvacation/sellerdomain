@@ -1,5 +1,6 @@
 """Configuration management for Domain Seller."""
 
+import copy
 import os
 from pathlib import Path
 
@@ -37,7 +38,7 @@ class Config:
     """Application configuration loaded from YAML file and environment variables."""
 
     def __init__(self, config_path=None):
-        self.data = dict(DEFAULT_CONFIG)
+        self.data = copy.deepcopy(DEFAULT_CONFIG)
         if config_path and Path(config_path).exists():
             self._load_file(config_path)
         elif Path("config.yaml").exists():

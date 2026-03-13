@@ -8,6 +8,7 @@ import tldextract
 import wordninja
 
 from core.abbreviations import expand_abbreviations
+from core.validators import validate_domain
 
 try:
     import whois
@@ -135,7 +136,7 @@ class DomainAnalyzer:
     """Analyzes a domain name to extract keywords, WHOIS, DNS, and estimate value."""
 
     def __init__(self, domain):
-        self.domain = domain.lower().strip()
+        self.domain = validate_domain(domain)
         self.extracted = tldextract.extract(self.domain)
         self.name = self.extracted.domain
         self.tld = self.extracted.suffix
@@ -252,10 +253,13 @@ class DomainAnalyzer:
             self.is_registered = False
 
     def _check_dns(self):
-        """Check DNS records."""
+        """Check DNS records with timeout."""
+        resolver = dns.resolver.Resolver()
+        resolver.timeout = 5
+        resolver.lifetime = 10
         for rtype in ["A", "MX", "NS"]:
             try:
-                answers = dns.resolver.resolve(self.domain, rtype)
+                answers = resolver.resolve(self.domain, rtype)
                 self.dns_records[rtype] = [str(r) for r in answers]
             except Exception:
                 self.dns_records[rtype] = []

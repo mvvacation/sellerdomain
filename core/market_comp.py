@@ -1,6 +1,7 @@
 """Domain marketplace price comparison — searches for similar domain sale prices."""
 
 import re
+import time
 
 try:
     from ddgs import DDGS
@@ -29,35 +30,40 @@ def find_comparable_sales(domain_name, tld, keywords):
     queries = _build_price_queries(domain_name, tld, keywords)
     all_hits = []
 
-    for query in queries[:6]:
-        try:
-            for item in DDGS().text(query, max_results=8):
-                url = item.get("href", "")
-                title = item.get("title", "")
-                snippet = item.get("body", "")
-                prices = _extract_prices(title + " " + snippet)
-                domains = _extract_domains(title + " " + snippet)
+    for qi, query in enumerate(queries[:6]):
+        for attempt in range(2):
+            try:
+                for item in DDGS().text(query, max_results=8):
+                    url = item.get("href", "")
+                    title = item.get("title", "")
+                    snippet = item.get("body", "")
+                    prices = _extract_prices(title + " " + snippet)
+                    domains = _extract_domains(title + " " + snippet)
 
-                if prices and domains:
-                    for d in domains[:2]:
-                        for p in prices[:2]:
+                    if prices and domains:
+                        for d in domains[:2]:
+                            for p in prices[:2]:
+                                all_hits.append({
+                                    "domain": d,
+                                    "price": p,
+                                    "source": _extract_source(url),
+                                    "url": url,
+                                })
+                    elif prices and not domains:
+                        for p in prices[:1]:
                             all_hits.append({
-                                "domain": d,
+                                "domain": _clean_title_domain(title),
                                 "price": p,
                                 "source": _extract_source(url),
                                 "url": url,
                             })
-                elif prices and not domains:
-                    # Price found but no specific domain — use info from title
-                    for p in prices[:1]:
-                        all_hits.append({
-                            "domain": _clean_title_domain(title),
-                            "price": p,
-                            "source": _extract_source(url),
-                            "url": url,
-                        })
-        except Exception:
-            continue
+                break  # success, no retry needed
+            except Exception:
+                if attempt == 0:
+                    time.sleep(1)  # brief pause before retry
+                continue
+        if qi < 5:
+            time.sleep(0.5)  # rate limit between queries
 
     # Deduplicate by domain name
     seen = set()

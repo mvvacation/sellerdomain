@@ -6,6 +6,7 @@ import io
 import json
 import os
 import queue
+import re
 import sys
 import threading
 import uuid
@@ -32,10 +33,13 @@ from core.html_report import generate_html_report
 from core.history import check_domain_history
 from core.social_checker import check_social_handles
 from core.market_comp import find_comparable_sales
+from core.validators import validate_domain, ValidationError
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(32).hex())
 tasks = {}
 _MAX_TASK_AGE = 1800  # 30 minutes
+_MAX_CONCURRENT_TASKS = 10  # prevent resource exhaustion
 
 
 def _cleanup_old_tasks():
@@ -78,11 +82,24 @@ def index():
 
 @app.route("/api/start", methods=["POST"])
 def api_start():
-    domain = (request.json or {}).get("domain", "").strip().lower()
-    if not domain:
+    raw_domain = (request.json or {}).get("domain", "").strip()
+    if not raw_domain:
         return jsonify(error="No domain provided"), 400
-    tid = uuid.uuid4().hex[:8]
+
+    try:
+        domain = validate_domain(raw_domain)
+    except ValidationError as e:
+        return jsonify(error=str(e)), 400
+
     _cleanup_old_tasks()
+
+    # Prevent resource exhaustion
+    with _tasks_lock:
+        running = sum(1 for t in tasks.values() if t.get("status") == "running")
+        if running >= _MAX_CONCURRENT_TASKS:
+            return jsonify(error="Too many concurrent tasks. Please wait."), 429
+
+    tid = uuid.uuid4().hex[:8]
     with _tasks_lock:
         tasks[tid] = {
             "q": queue.Queue(),
@@ -149,11 +166,13 @@ def api_all_emails(tid, idx):
 
 @app.route("/api/export/<tid>/<fmt>")
 def api_export(tid, fmt):
+    if fmt not in ("html", "json", "csv"):
+        return jsonify(error="Invalid format. Use: html, json, csv"), 400
     t = tasks.get(tid)
     if not t or "leads" not in t["results"]:
         return jsonify(error="Not found"), 404
     leads, analysis = t["results"]["leads"], t["results"]["analysis"]
-    safe = t["domain"].replace(".", "_")
+    safe = re.sub(r"[^a-zA-Z0-9_]", "_", t["domain"])
 
     if fmt == "html":
         content = generate_html_report(leads, analysis)
