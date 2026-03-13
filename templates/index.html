@@ -1,0 +1,1286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Domain Seller</title>
+<style>
+/* ── Variables & Reset ─────────────────────────────────────────── */
+:root {
+  --bg-0: #060a14;
+  --bg-1: #0d1321;
+  --bg-2: #141c32;
+  --bg-3: #1c2844;
+  --border: #1e2d4a;
+  --accent: #3b82f6;
+  --accent-h: #60a5fa;
+  --green: #22c55e;
+  --yellow: #eab308;
+  --orange: #f97316;
+  --red: #ef4444;
+  --purple: #a855f7;
+  --text-0: #f0f4ff;
+  --text-1: #b8c4dc;
+  --text-2: #5c6e8a;
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg-0);
+  color: var(--text-1);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+a { color: var(--accent-h); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.hidden { display: none !important; }
+
+/* ── Header ────────────────────────────────────────────────────── */
+header {
+  position: sticky; top: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 32px;
+  background: rgba(6,10,20,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+.logo { font-size: 1.1rem; font-weight: 700; color: var(--text-0); letter-spacing: .5px; }
+.logo span { color: var(--accent); }
+.btn-new {
+  padding: 8px 18px; font-size: .85rem; font-weight: 600;
+  background: var(--bg-2); color: var(--text-1); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); cursor: pointer; transition: .2s;
+}
+.btn-new:hover { background: var(--bg-3); color: var(--text-0); }
+
+/* ── Landing ───────────────────────────────────────────────────── */
+#s-landing {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: calc(100vh - 56px); padding: 40px 24px; position: relative;
+}
+#s-landing::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  background: radial-gradient(ellipse at 30% 40%, rgba(59,130,246,0.07), transparent 60%),
+              radial-gradient(ellipse at 70% 60%, rgba(168,85,247,0.05), transparent 60%);
+}
+.hero-title {
+  font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 800;
+  color: var(--text-0); text-align: center; line-height: 1.2; margin-bottom: 16px;
+}
+.grad { background: linear-gradient(135deg, var(--accent), var(--purple));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.hero-sub { color: var(--text-2); font-size: 1.15rem; text-align: center; margin-bottom: 40px; max-width: 480px; }
+.input-row { display: flex; width: 100%; max-width: 560px; }
+.input-row input {
+  flex: 1; padding: 16px 20px; font-size: 1.05rem;
+  border: 2px solid var(--border); border-right: none;
+  border-radius: var(--radius) 0 0 var(--radius);
+  background: var(--bg-1); color: var(--text-0); outline: none;
+  transition: border-color .2s;
+}
+.input-row input:focus { border-color: var(--accent); }
+.input-row input::placeholder { color: var(--text-2); }
+.btn-go {
+  padding: 16px 28px; font-size: 1.05rem; font-weight: 700; white-space: nowrap;
+  background: var(--accent); color: #fff; border: 2px solid var(--accent);
+  border-radius: 0 var(--radius) var(--radius) 0; cursor: pointer; transition: .2s;
+}
+.btn-go:hover { background: var(--accent-h); border-color: var(--accent-h); }
+.btn-go:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ── Processing ────────────────────────────────────────────────── */
+#s-processing { padding: 48px 32px; max-width: 720px; margin: 0 auto; }
+.steps-row {
+  display: flex; align-items: center; justify-content: center; gap: 0;
+  margin-bottom: 40px;
+}
+.step-item { display: flex; align-items: center; gap: 10px; }
+.step-circle {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .85rem; font-weight: 700;
+  background: var(--bg-2); color: var(--text-2); border: 2px solid var(--border);
+  transition: .3s;
+}
+.step-label { font-size: .85rem; color: var(--text-2); font-weight: 600; transition: .3s; }
+.step-line { width: 48px; height: 2px; background: var(--border); margin: 0 4px; transition: .3s; }
+.step-item.active .step-circle {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+  animation: pulse 1.5s infinite;
+}
+.step-item.active .step-label { color: var(--text-0); }
+.step-item.done .step-circle { background: var(--green); color: #fff; border-color: var(--green); }
+.step-item.done .step-label { color: var(--green); }
+.step-line.done { background: var(--green); }
+
+.progress-area { margin-bottom: 24px; }
+.progress-track {
+  height: 6px; border-radius: 3px; background: var(--bg-2); overflow: hidden; margin-bottom: 10px;
+}
+.progress-fill {
+  height: 100%; border-radius: 3px; width: 0%;
+  background: linear-gradient(90deg, var(--accent), var(--purple)); transition: width .3s;
+}
+.progress-status { font-size: .9rem; color: var(--text-2); }
+.log-box {
+  background: var(--bg-1); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 16px; max-height: 200px; overflow-y: auto; font-family: 'Consolas','Courier New',monospace;
+  font-size: .82rem; color: var(--text-2); line-height: 1.6;
+}
+.log-box .log-line-new { color: var(--text-1); }
+
+/* analysis preview during processing */
+.analysis-mini {
+  margin-top: 24px; padding: 16px; background: var(--bg-1);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  display: flex; flex-wrap: wrap; gap: 20px; font-size: .9rem;
+}
+.analysis-mini strong { color: var(--text-0); }
+.analysis-mini .am-val { color: var(--green); font-weight: 700; }
+
+/* ── Results ───────────────────────────────────────────────────── */
+#s-results { padding: 32px; max-width: 1200px; margin: 0 auto; }
+
+/* analysis card */
+.analysis-card {
+  background: var(--bg-1); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 28px 32px; margin-bottom: 24px;
+}
+.ac-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; margin-bottom: 16px; }
+.ac-domain { font-size: 1.6rem; font-weight: 800; color: var(--text-0); }
+.ac-tld { color: var(--text-2); font-weight: 400; }
+.ac-value { text-align: right; }
+.ac-value-label { font-size: .75rem; color: var(--text-2); text-transform: uppercase; letter-spacing: 1px; }
+.ac-value-range { font-size: 1.3rem; font-weight: 700; color: var(--green); }
+.ac-meta { display: flex; flex-wrap: wrap; gap: 24px; font-size: .9rem; }
+.ac-meta-item { display: flex; align-items: center; gap: 6px; }
+.ac-meta-label { color: var(--text-2); }
+.ac-pill {
+  display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: .8rem;
+  background: var(--bg-3); color: var(--accent-h); margin: 0 3px;
+}
+.ac-details {
+  display: flex; gap: 16px; flex-wrap: wrap; margin-top: 16px; padding-top: 16px;
+  border-top: 1px solid var(--border); font-size: .82rem; color: var(--text-2);
+}
+.ac-details span { margin-right: 8px; }
+
+/* stats bar */
+.stats-bar {
+  display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;
+}
+.stat-card {
+  flex: 1; min-width: 120px; padding: 16px 20px;
+  background: var(--bg-1); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  text-align: center;
+}
+.stat-val { font-size: 1.8rem; font-weight: 800; color: var(--text-0); }
+.stat-val.green { color: var(--green); }
+.stat-val.yellow { color: var(--yellow); }
+.stat-val.accent { color: var(--accent-h); }
+.stat-label { font-size: .75rem; color: var(--text-2); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+
+/* toolbar */
+.toolbar {
+  display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; align-items: center;
+}
+.toolbar-title { font-size: 1.1rem; font-weight: 700; color: var(--text-0); margin-right: auto; }
+.btn-sm {
+  padding: 8px 16px; font-size: .82rem; font-weight: 600;
+  background: var(--bg-2); color: var(--text-1); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); cursor: pointer; transition: .2s;
+}
+.btn-sm:hover { background: var(--bg-3); color: var(--text-0); }
+.btn-sm.accent { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-sm.accent:hover { background: var(--accent-h); }
+
+/* brandability card */
+.brand-card {
+  display: flex; align-items: center; gap: 20px;
+  margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);
+}
+.brand-grade {
+  width: 48px; height: 48px; border-radius: 12px; display: flex;
+  align-items: center; justify-content: center; font-size: 1.1rem;
+  font-weight: 800; flex-shrink: 0;
+}
+.brand-grade.grade-a { background: rgba(34,197,94,.15); color: var(--green); }
+.brand-grade.grade-b { background: rgba(234,179,8,.15); color: var(--yellow); }
+.brand-grade.grade-c { background: rgba(249,115,22,.15); color: var(--orange); }
+.brand-grade.grade-d { background: rgba(239,68,68,.15); color: var(--red); }
+.brand-info { flex: 1; }
+.brand-title { font-size: .85rem; font-weight: 700; color: var(--text-0); margin-bottom: 4px; }
+.brand-factors { font-size: .8rem; color: var(--text-2); line-height: 1.5; }
+
+/* interpretation card */
+.interp-card {
+  margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);
+}
+.interp-header {
+  font-size: .88rem; font-weight: 700; color: var(--accent); margin-bottom: 10px;
+}
+.interp-body { font-size: .82rem; color: var(--text-1); }
+.interp-niche { font-size: .88rem; color: var(--text-0); font-weight: 600; }
+.ac-pill.interp-geo { background: rgba(59,130,246,.18); color: #60a5fa; border-color: rgba(59,130,246,.3); }
+.ac-pill.interp-ind { background: rgba(168,85,247,.18); color: #c084fc; border-color: rgba(168,85,247,.3); }
+.ac-pill small { opacity: .7; font-size: .75em; }
+
+/* enrichment sections (history, social, market) */
+.enrich-section {
+  margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);
+}
+.enrich-title {
+  font-size: .88rem; font-weight: 700; color: var(--accent); margin-bottom: 10px;
+}
+.enrich-grid {
+  display: grid; grid-template-columns: auto 1fr; gap: 4px 14px;
+  font-size: .82rem; color: var(--text-1);
+}
+.enrich-label { color: var(--text-2); font-weight: 600; }
+.enrich-note { font-size: .82rem; color: var(--text-2); }
+
+/* social handles */
+.sh-summary { font-size: .82rem; color: var(--text-1); margin-bottom: 8px; }
+.sh-grid {
+  display: flex; gap: 8px; flex-wrap: wrap;
+}
+.sh-item {
+  display: flex; align-items: center; gap: 5px; padding: 4px 10px;
+  border-radius: 6px; font-size: .78rem; font-weight: 600;
+  border: 1px solid var(--border);
+}
+.sh-icon { font-size: .7rem; }
+.sh-taken { background: rgba(34,197,94,.1); color: var(--green); border-color: rgba(34,197,94,.3); }
+.sh-avail { background: rgba(239,68,68,.1); color: var(--red); border-color: rgba(239,68,68,.3); }
+.sh-unk { background: var(--bg-2); color: var(--text-2); }
+.sh-link { color: inherit; text-decoration: none; }
+.sh-link:hover { text-decoration: underline; }
+
+/* market comparables */
+.mkt-range { font-size: .84rem; color: var(--text-0); margin-bottom: 8px; }
+.mkt-list { display: flex; flex-direction: column; gap: 4px; }
+.mkt-row {
+  display: grid; grid-template-columns: 1fr auto auto;
+  gap: 12px; align-items: center; padding: 4px 0;
+  font-size: .8rem; border-bottom: 1px solid rgba(255,255,255,.05);
+}
+.mkt-domain { color: var(--text-0); font-weight: 600; }
+.mkt-price { color: var(--green); font-weight: 700; }
+.mkt-source { color: var(--text-2); font-size: .75rem; }
+
+/* enrichment mini preview */
+.analysis-enriched-mini {
+  margin-top: 8px; font-size: .82rem; color: var(--text-1);
+  display: flex; flex-direction: column; gap: 3px;
+}
+
+/* filter bar */
+.filter-bar {
+  display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center;
+}
+.filter-group { display: flex; align-items: center; gap: 6px; }
+.filter-label { font-size: .78rem; color: var(--text-2); text-transform: uppercase; letter-spacing: .5px; }
+.filter-select {
+  padding: 6px 12px; font-size: .82rem;
+  background: var(--bg-2); color: var(--text-1); border: 1px solid var(--border);
+  border-radius: 6px; outline: none; cursor: pointer;
+}
+.filter-select:focus { border-color: var(--accent); }
+.filter-input {
+  padding: 6px 12px; font-size: .82rem; width: 180px;
+  background: var(--bg-2); color: var(--text-1); border: 1px solid var(--border);
+  border-radius: 6px; outline: none;
+}
+.filter-input:focus { border-color: var(--accent); }
+.filter-input::placeholder { color: var(--text-2); }
+.filter-chip {
+  padding: 5px 12px; font-size: .78rem; font-weight: 600;
+  background: var(--bg-2); color: var(--text-2); border: 1px solid var(--border);
+  border-radius: 20px; cursor: pointer; transition: .15s;
+}
+.filter-chip:hover { border-color: var(--accent); color: var(--text-1); }
+.filter-chip.active { background: rgba(59,130,246,.15); border-color: var(--accent); color: var(--accent-h); }
+.result-count { font-size: .82rem; color: var(--text-2); margin-left: auto; }
+
+/* buyer type badge */
+.buyer-badge {
+  display: inline-block; padding: 2px 9px; border-radius: 12px; font-size: .72rem;
+  font-weight: 600; text-transform: uppercase; letter-spacing: .3px;
+}
+.buyer-badge.exact_match { background: rgba(34,197,94,.15); color: var(--green); }
+.buyer-badge.similar_domain { background: rgba(59,130,246,.15); color: var(--accent-h); }
+.buyer-badge.strong_upgrade { background: rgba(168,85,247,.15); color: var(--purple); }
+.buyer-badge.funded_startup { background: rgba(234,179,8,.15); color: var(--yellow); }
+.buyer-badge.high_relevance { background: rgba(249,115,22,.12); color: var(--orange); }
+.buyer-badge.moderate_relevance, .buyer-badge.general { background: var(--bg-3); color: var(--text-2); }
+
+/* score breakdown bar */
+.breakdown-bars { margin-top: 12px; }
+.bd-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-size: .78rem; }
+.bd-label { width: 100px; color: var(--text-2); text-align: right; flex-shrink: 0; }
+.bd-track { flex: 1; height: 6px; background: var(--bg-3); border-radius: 3px; overflow: hidden; }
+.bd-fill { height: 100%; border-radius: 3px; transition: width .5s; }
+.bd-val { width: 28px; color: var(--text-2); font-weight: 600; }
+
+/* leads grid */
+.leads-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+.lead-card {
+  background: var(--bg-1); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 24px; cursor: pointer; transition: transform .2s, box-shadow .2s, border-color .2s;
+  animation: fadeUp .4s ease backwards;
+}
+.lead-card:hover { transform: translateY(-3px); box-shadow: 0 8px 32px rgba(0,0,0,.35); border-color: var(--bg-3); }
+.lc-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+.lc-rank { font-size: .75rem; color: var(--text-2); font-weight: 600; }
+.lc-name { font-size: 1.05rem; font-weight: 700; color: var(--text-0); margin-top: 2px; }
+.lc-site { font-size: .85rem; color: var(--accent-h); margin-top: 2px; }
+.score-badge {
+  width: 48px; height: 48px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .95rem; font-weight: 800; flex-shrink: 0;
+  border: 3px solid; background: var(--bg-0);
+}
+.score-hot { border-color: var(--green); color: var(--green); }
+.score-warm { border-color: var(--yellow); color: var(--yellow); }
+.score-cool { border-color: var(--orange); color: var(--orange); }
+.score-cold { border-color: var(--text-2); color: var(--text-2); }
+
+.lc-bar { height: 4px; border-radius: 2px; background: var(--bg-3); margin-bottom: 14px; overflow: hidden; }
+.lc-bar-fill { height: 100%; border-radius: 2px; transition: width .5s; }
+
+.lc-desc {
+  font-size: .85rem; color: var(--text-2); line-height: 1.5;
+  margin-bottom: 14px; display: -webkit-box; -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical; overflow: hidden;
+}
+.lc-contact { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.lc-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 20px; font-size: .78rem;
+  background: var(--bg-2); color: var(--text-1);
+}
+.lc-tag.email-tag { background: rgba(59,130,246,.15); color: var(--accent-h); }
+.lc-tag.phone-tag { background: rgba(34,197,94,.12); color: var(--green); }
+.lc-tag.tech-tag { background: rgba(168,85,247,.12); color: var(--purple); }
+.lc-actions { display: flex; gap: 8px; margin-top: 4px; }
+.lc-btn {
+  padding: 6px 14px; font-size: .8rem; font-weight: 600;
+  background: var(--bg-2); color: var(--text-1); border: 1px solid var(--border);
+  border-radius: 6px; cursor: pointer; transition: .15s;
+}
+.lc-btn:hover { background: var(--bg-3); color: var(--text-0); }
+.lc-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.lc-btn.primary:hover { background: var(--accent-h); }
+
+/* ── Detail panel (slide-in from right) ────────────────────────── */
+.panel-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 199;
+  opacity: 0; transition: opacity .3s; pointer-events: none;
+}
+.panel-overlay.open { opacity: 1; pointer-events: auto; }
+
+.detail-panel {
+  position: fixed; top: 0; right: -520px; width: 500px; max-width: 90vw;
+  height: 100vh; z-index: 200; background: var(--bg-1);
+  border-left: 1px solid var(--border); overflow-y: auto;
+  transition: right .3s ease; padding: 32px;
+}
+.detail-panel.open { right: 0; }
+.dp-close {
+  position: absolute; top: 16px; right: 16px;
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg-2); color: var(--text-1); border: 1px solid var(--border);
+  cursor: pointer; font-size: 1rem; transition: .15s;
+}
+.dp-close:hover { background: var(--bg-3); color: var(--text-0); }
+.dp-score-row { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+.dp-score-big {
+  width: 64px; height: 64px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center; font-size: 1.3rem;
+  font-weight: 800; border: 4px solid; background: var(--bg-0);
+}
+.dp-name { font-size: 1.4rem; font-weight: 800; color: var(--text-0); }
+.dp-website { font-size: .9rem; color: var(--accent-h); }
+.dp-section { margin-top: 20px; }
+.dp-label { font-size: .75rem; color: var(--text-2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+.dp-text { font-size: .9rem; color: var(--text-1); line-height: 1.6; }
+.dp-list { list-style: none; padding: 0; }
+.dp-list li { padding: 4px 0; font-size: .88rem; color: var(--text-1); }
+.dp-list li::before { content: '→ '; color: var(--text-2); }
+.dp-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.dp-tag {
+  padding: 4px 12px; border-radius: 20px; font-size: .8rem;
+  background: var(--bg-2); color: var(--text-1);
+}
+.dp-actions { display: flex; gap: 10px; margin-top: 28px; }
+
+/* ── Email modal ───────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 299;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity .3s; pointer-events: none;
+}
+.modal-overlay.open { opacity: 1; pointer-events: auto; }
+.modal-box {
+  background: var(--bg-1); border: 1px solid var(--border); border-radius: var(--radius);
+  width: 680px; max-width: 94vw; max-height: 85vh; overflow-y: auto;
+  padding: 32px; position: relative;
+  transform: translateY(20px); transition: transform .3s;
+}
+.modal-overlay.open .modal-box { transform: translateY(0); }
+.modal-close {
+  position: absolute; top: 16px; right: 16px;
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg-2); color: var(--text-1); border: 1px solid var(--border);
+  cursor: pointer; font-size: 1rem;
+}
+.modal-title { font-size: 1.2rem; font-weight: 700; color: var(--text-0); margin-bottom: 20px; }
+.tabs { display: flex; gap: 2px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+.tab {
+  padding: 10px 18px; font-size: .85rem; font-weight: 600; cursor: pointer;
+  color: var(--text-2); border: none; background: none; border-bottom: 2px solid transparent;
+  transition: .2s;
+}
+.tab.active { color: var(--accent-h); border-bottom-color: var(--accent); }
+.tab:hover { color: var(--text-0); }
+.email-subject {
+  font-size: .95rem; font-weight: 600; color: var(--text-0);
+  padding: 12px 16px; background: var(--bg-2); border-radius: var(--radius-sm);
+  margin-bottom: 16px;
+}
+.email-body {
+  font-size: .9rem; color: var(--text-1); line-height: 1.7;
+  padding: 16px; background: var(--bg-0); border-radius: var(--radius-sm);
+  white-space: pre-wrap; border: 1px solid var(--border);
+}
+.modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+
+/* ── Error ─────────────────────────────────────────────────────── */
+.error-card {
+  text-align: center; padding: 48px; max-width: 480px; margin: 80px auto;
+  background: var(--bg-1); border: 1px solid var(--border); border-radius: var(--radius);
+}
+.error-card h2 { color: var(--red); margin-bottom: 12px; }
+
+/* ── Empty state ───────────────────────────────────────────────── */
+.empty-state {
+  text-align: center; padding: 64px 32px; max-width: 480px; margin: 60px auto;
+  background: var(--bg-1); border: 1px dashed var(--border); border-radius: var(--radius);
+}
+.empty-state h3 { color: var(--text-0); margin-bottom: 8px; }
+.empty-icon { font-size: 3rem; margin-bottom: 16px; }
+
+/* ── Toast ─────────────────────────────────────────────────────── */
+.toast {
+  position: fixed; bottom: 24px; right: 24px; padding: 12px 24px;
+  border-radius: var(--radius-sm); background: var(--bg-2); border: 1px solid var(--border);
+  color: var(--text-0); font-size: .9rem; z-index: 400;
+  animation: fadeUp .3s ease, fadeOut .3s ease 2.7s forwards;
+}
+.toast.success { border-color: var(--green); }
+.toast.error { border-color: var(--red); color: var(--red); }
+
+/* ── Animations ────────────────────────────────────────────────── */
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,.5); }
+  50% { box-shadow: 0 0 0 8px rgba(59,130,246,0); }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeOut {
+  to { opacity: 0; transform: translateY(-8px); }
+}
+
+/* ── Responsive ────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  header { padding: 12px 16px; }
+  #s-results { padding: 16px; }
+  .leads-grid { grid-template-columns: 1fr; }
+  .detail-panel { width: 100vw; right: -100vw; }
+  .step-line { width: 20px; }
+  .step-label { font-size: .75rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────── -->
+<header>
+  <div class="logo"><span>&#9670;</span> Domain Seller</div>
+  <button class="btn-new hidden" id="btn-new" onclick="resetLanding()">+ New Search</button>
+</header>
+
+<!-- ── Landing ─────────────────────────────────────────────── -->
+<section id="s-landing">
+  <h1 class="hero-title">Find <span class="grad">Real Buyers</span><br>For Your Domains</h1>
+  <p class="hero-sub">Enter a domain name and we'll identify companies that would want to buy it — using real, live data.</p>
+  <div class="input-row">
+    <input type="text" id="inp-domain" placeholder="e.g. healthtrack.com" autofocus
+           onkeydown="if(event.key==='Enter') startSearch()">
+    <button class="btn-go" id="btn-go" onclick="startSearch()">Find Buyers</button>
+  </div>
+</section>
+
+<!-- ── Processing ──────────────────────────────────────────── -->
+<section id="s-processing" class="hidden">
+  <div class="steps-row">
+    <div class="step-item" data-si="0"><div class="step-circle">1</div><div class="step-label">Analyze</div></div>
+    <div class="step-line" data-sl="0"></div>
+    <div class="step-item" data-si="1"><div class="step-circle">2</div><div class="step-label">Search</div></div>
+    <div class="step-line" data-sl="1"></div>
+    <div class="step-item" data-si="2"><div class="step-circle">3</div><div class="step-label">Enrich</div></div>
+    <div class="step-line" data-sl="2"></div>
+    <div class="step-item" data-si="3"><div class="step-circle">4</div><div class="step-label">Score</div></div>
+  </div>
+  <div class="progress-area">
+    <div class="progress-track"><div class="progress-fill" id="pbar"></div></div>
+    <div class="progress-status" id="pstatus">Starting...</div>
+  </div>
+  <div class="log-box" id="log"></div>
+  <div id="analysis-preview" class="hidden"></div>
+</section>
+
+<!-- ── Results ─────────────────────────────────────────────── -->
+<section id="s-results" class="hidden">
+  <div id="analysis-card"></div>
+  <div class="stats-bar" id="stats-bar"></div>
+  <div class="toolbar">
+    <div class="toolbar-title" id="toolbar-title">Potential Buyers</div>
+    <button class="btn-sm" onclick="exportAs('csv')">&#128196; CSV</button>
+    <button class="btn-sm" onclick="exportAs('json')">&#123;&#125; JSON</button>
+    <button class="btn-sm accent" onclick="exportAs('html')">&#128202; HTML Report</button>
+  </div>
+  <div class="filter-bar" id="filter-bar">
+    <input type="text" class="filter-input" placeholder="Search leads..." id="filter-search" oninput="applyFilters()">
+    <div class="filter-group">
+      <span class="filter-label">Score:</span>
+      <select class="filter-select" id="filter-score" onchange="applyFilters()">
+        <option value="all">All</option>
+        <option value="hot">Hot (70+)</option>
+        <option value="warm">Warm (50-69)</option>
+        <option value="cool">Cool (30-49)</option>
+        <option value="cold">Cold (&lt;30)</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Contact:</span>
+      <select class="filter-select" id="filter-contact" onchange="applyFilters()">
+        <option value="all">All</option>
+        <option value="email">Has Email</option>
+        <option value="phone">Has Phone</option>
+        <option value="any">Has Any</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Sort:</span>
+      <select class="filter-select" id="sort-by" onchange="applyFilters()">
+        <option value="score">Score (High→Low)</option>
+        <option value="score-asc">Score (Low→High)</option>
+        <option value="name">Name (A-Z)</option>
+        <option value="name-desc">Name (Z-A)</option>
+      </select>
+    </div>
+    <span class="result-count" id="result-count"></span>
+  </div>
+  <div class="leads-grid" id="leads-grid"></div>
+</section>
+
+<!-- ── Detail panel ────────────────────────────────────────── -->
+<div class="panel-overlay" id="panel-overlay" onclick="closeDetail()"></div>
+<aside class="detail-panel" id="detail-panel">
+  <button class="dp-close" onclick="closeDetail()">&times;</button>
+  <div id="dp-content"></div>
+</aside>
+
+<!-- ── Email modal ─────────────────────────────────────────── -->
+<div class="modal-overlay" id="email-overlay">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeEmail()">&times;</button>
+    <div class="modal-title" id="email-title">Outreach Email</div>
+    <div class="tabs" id="email-tabs"></div>
+    <div class="email-subject" id="email-subject"></div>
+    <div class="email-body" id="email-body"></div>
+    <div class="modal-actions">
+      <button class="btn-sm accent" onclick="copyEmail()">Copy to Clipboard</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── State ─────────────────────────────────────────────────── */
+let S = { tid: null, leads: [], analysis: null, emailData: null };
+
+const STEP_MAP = {
+  analysis: 0, queries: 1, search: 1, extract: 1,
+  enrich: 2, similar: 2, variations: 2, contacts: 2, scoring: 3
+};
+
+/* ── Helpers ────────────────────────────────────────────────── */
+const $ = id => document.getElementById(id);
+const show = el => el.classList.remove('hidden');
+const hide = el => el.classList.add('hidden');
+
+function toast(msg, type='info') {
+  const d = document.createElement('div');
+  d.className = 'toast ' + type;
+  d.textContent = msg;
+  document.body.appendChild(d);
+  setTimeout(() => d.remove(), 3200);
+}
+
+function scoreClass(s) {
+  if (s >= 70) return 'score-hot';
+  if (s >= 50) return 'score-warm';
+  if (s >= 30) return 'score-cool';
+  return 'score-cold';
+}
+
+function scoreColor(s) {
+  if (s >= 70) return 'var(--green)';
+  if (s >= 50) return 'var(--yellow)';
+  if (s >= 30) return 'var(--orange)';
+  return 'var(--text-2)';
+}
+
+function esc(str) {
+  const d = document.createElement('div');
+  d.textContent = str || '';
+  return d.innerHTML;
+}
+
+/* ── Start search ──────────────────────────────────────────── */
+async function startSearch() {
+  const domain = $('inp-domain').value.trim().toLowerCase();
+  if (!domain) { $('inp-domain').focus(); return; }
+
+  $('btn-go').disabled = true;
+  hide($('s-landing'));
+  show($('s-processing'));
+  show($('btn-new'));
+  resetProcessingUI();
+
+  try {
+    const res = await fetch('/api/start', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({domain})
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    S.tid = data.task_id;
+    connectSSE(data.task_id);
+  } catch (e) {
+    showError(e.message);
+  }
+}
+
+/* ── SSE ───────────────────────────────────────────────────── */
+function connectSSE(tid) {
+  const es = new EventSource('/api/stream/' + tid);
+  es.onmessage = e => {
+    const d = JSON.parse(e.data);
+    if (d.type === 'ping') return;
+    if (d.type === 'step') handleStep(d);
+    else if (d.type === 'progress') handleProgress(d);
+    else if (d.type === 'analysis_done') handleAnalysisDone(d.data);
+    else if (d.type === 'analysis_enriched') handleAnalysisEnriched(d.data);
+    else if (d.type === 'done') { es.close(); handleDone(d); }
+    else if (d.type === 'error') { es.close(); showError(d.msg); }
+  };
+  es.onerror = () => { es.close(); };
+}
+
+function resetProcessingUI() {
+  document.querySelectorAll('.step-item').forEach(el => {
+    el.classList.remove('active', 'done');
+  });
+  document.querySelectorAll('.step-line').forEach(el => el.classList.remove('done'));
+  $('pbar').style.width = '0%';
+  $('pstatus').textContent = 'Starting...';
+  $('log').innerHTML = '';
+  hide($('analysis-preview'));
+}
+
+function handleStep(d) {
+  const idx = STEP_MAP[d.step] ?? 0;
+  document.querySelectorAll('.step-item').forEach(el => {
+    const si = +el.dataset.si;
+    el.classList.toggle('active', si === idx);
+    el.classList.toggle('done', si < idx);
+  });
+  document.querySelectorAll('.step-line').forEach(el => {
+    el.classList.toggle('done', +el.dataset.sl < idx);
+  });
+  $('pstatus').textContent = d.msg || '';
+  $('pbar').style.width = '0%';
+  addLog(d.msg);
+}
+
+function handleProgress(d) {
+  if (d.cur && d.tot) {
+    $('pbar').style.width = Math.round(d.cur / d.tot * 100) + '%';
+  }
+  $('pstatus').textContent = d.msg || '';
+  if (d.msg) addLog(d.msg);
+}
+
+function addLog(msg) {
+  if (!msg) return;
+  const log = $('log');
+  // Remove 'new' class from previous lines
+  log.querySelectorAll('.log-line-new').forEach(el => el.classList.remove('log-line-new'));
+  const line = document.createElement('div');
+  line.className = 'log-line-new';
+  line.textContent = msg;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}
+
+function handleAnalysisDone(data) {
+  S.analysis = data;
+  const preview = $('analysis-preview');
+  show(preview);
+  const kw = (data.keywords || []).join(', ');
+  const ind = (data.industries || []).map(i => i.replace(/_/g,' ')).join(', ');
+  const vl = (data.estimated_value_low || 0).toLocaleString();
+  const vh = (data.estimated_value_high || 0).toLocaleString();
+  preview.innerHTML = `<div class="analysis-mini">
+    <div><strong>${esc(data.domain)}</strong></div>
+    <div>Keywords: <strong>${esc(kw)}</strong></div>
+    <div>Industries: <strong>${esc(ind)}</strong></div>
+    <div>Value: <span class="am-val">$${vl} — $${vh}</span></div>
+  </div>`;
+}
+
+function handleAnalysisEnriched(data) {
+  S.analysis = data;
+  // Update the preview with enrichment signals
+  const preview = $('analysis-preview');
+  const hist = data.history || {};
+  const soc = data.social_handles || {};
+  const mkt = data.market_comp || {};
+  let extras = [];
+  if (hist.has_history) extras.push(`📜 ${hist.total_snapshots} archive snapshots`);
+  if (soc.taken_count > 0) extras.push(`📱 @${esc(soc.handle)} taken on ${soc.taken_count} platforms`);
+  if (mkt.market_summary) extras.push(`💰 ${esc(mkt.market_summary)}`);
+  if (extras.length) {
+    const el = document.createElement('div');
+    el.className = 'analysis-enriched-mini';
+    el.innerHTML = extras.map(e => `<div>${e}</div>`).join('');
+    preview.appendChild(el);
+  }
+}
+
+async function handleDone(d) {
+  // Mark all steps done
+  document.querySelectorAll('.step-item').forEach(el => {
+    el.classList.remove('active');
+    el.classList.add('done');
+  });
+  document.querySelectorAll('.step-line').forEach(el => el.classList.add('done'));
+  $('pbar').style.width = '100%';
+  $('pstatus').textContent = `Done! Found ${d.count} potential buyers.`;
+
+  // Fetch full results
+  try {
+    const res = await fetch('/api/results/' + S.tid);
+    const data = await res.json();
+    S.analysis = data.analysis;
+    S.leads = data.leads || [];
+    setTimeout(() => showResults(d), 800);
+  } catch (e) {
+    showError('Failed to load results: ' + e.message);
+  }
+}
+
+/* ── Show results ──────────────────────────────────────────── */
+function showResults(summary) {
+  hide($('s-processing'));
+  show($('s-results'));
+  renderAnalysis();
+  renderStats(summary);
+  renderLeads();
+}
+
+function renderAnalysis() {
+  const a = S.analysis;
+  if (!a) return;
+  const kw = (a.keywords || []).map(k => `<span class="ac-pill">${esc(k)}</span>`).join('');
+  const ind = (a.industries || []).map(i => `<span class="ac-pill">${esc(i.replace(/_/g,' '))}</span>`).join('');
+  const vl = (a.estimated_value_low || 0).toLocaleString();
+  const vh = (a.estimated_value_high || 0).toLocaleString();
+  const age = a.domain_age_years ? `${a.domain_age_years} years old` : '';
+
+  let details = '';
+  const whois = a.whois || {};
+  const dns = a.dns || {};
+  let parts = [];
+  if (whois.registrar) parts.push(`Registrar: ${esc(whois.registrar)}`);
+  if (whois.creation_date) parts.push(`Created: ${String(whois.creation_date).slice(0,10)}`);
+  if (whois.expiration_date) parts.push(`Expires: ${String(whois.expiration_date).slice(0,10)}`);
+  const dnsA = (dns.A || []).slice(0,2).join(', ');
+  const dnsMX = (dns.MX || []).slice(0,2).join(', ');
+  if (dnsA) parts.push(`A: ${esc(dnsA)}`);
+  if (dnsMX) parts.push(`MX: ${esc(dnsMX)}`);
+  if (parts.length) details = `<div class="ac-details">${parts.map(p=>`<span>${p}</span>`).join('')}</div>`;
+
+  // Brandability section
+  let brandHtml = '';
+  const brand = a.brandability;
+  if (brand) {
+    const g = (brand.grade || 'C').charAt(0).toUpperCase();
+    const gClass = g === 'A' ? 'grade-a' : g === 'B' ? 'grade-b' : g === 'C' ? 'grade-c' : 'grade-d';
+    const factors = (brand.factors || []).map(f => esc(f)).join(' &middot; ');
+    brandHtml = `<div class="brand-card">
+      <div class="brand-grade ${gClass}">${esc(brand.grade || '')}</div>
+      <div class="brand-info">
+        <div class="brand-title">Brandability Score: ${brand.score || 0}/100</div>
+        <div class="brand-factors">${factors}</div>
+      </div>
+    </div>`;
+  }
+
+  // Interpretations / smart context section
+  let interpHtml = '';
+  const interps = a.interpretations || [];
+  const geoTargets = a.geo_targets || [];
+  const nicheCtx = a.niche_context || '';
+  if (interps.length > 0 || nicheCtx) {
+    let pills = interps.slice(0, 8).map(i => {
+      const pct = Math.round((i.confidence || 0) * 100);
+      const typeClass = (i.type || '').startsWith('geo') ? 'interp-geo' : 'interp-ind';
+      return `<span class="ac-pill ${typeClass}" title="${esc(i.reason || '')}">${esc(i.expansion)} <small>(${pct}%)</small></span>`;
+    }).join('');
+    let nicheRow = '';
+    if (nicheCtx) {
+      nicheRow = `<div class="interp-niche"><span class="ac-meta-label">Niche Context:</span> ${esc(nicheCtx)}</div>`;
+    }
+    let geoRow = '';
+    if (geoTargets.length > 0) {
+      geoRow = `<div style="margin-top:6px"><span class="ac-meta-label">Geo Targets:</span> ${geoTargets.map(g => `<span class="ac-pill interp-geo">${esc(g)}</span>`).join('')}</div>`;
+    }
+    interpHtml = `<div class="interp-card">
+      <div class="interp-header">&#x1F9E0; Smart Domain Interpretation</div>
+      <div class="interp-body">
+        ${nicheRow}
+        <div style="margin-top:6px"><span class="ac-meta-label">Possible Meanings:</span> ${pills}</div>
+        ${geoRow}
+      </div>
+    </div>`;
+  }
+
+  $('analysis-card').innerHTML = `<div class="analysis-card">
+    <div class="ac-header">
+      <div>
+        <div class="ac-domain">${esc(a.name)}<span class="ac-tld">.${esc(a.tld)}</span></div>
+        <div class="ac-meta" style="margin-top:8px">
+          ${age ? `<div class="ac-meta-item"><span class="ac-meta-label">Age:</span> ${age}</div>` : ''}
+        </div>
+      </div>
+      <div class="ac-value">
+        <div class="ac-value-label">Estimated Value</div>
+        <div class="ac-value-range">$${vl} — $${vh}</div>
+      </div>
+    </div>
+    <div class="ac-meta">
+      <div class="ac-meta-item"><span class="ac-meta-label">Keywords:</span> ${kw}</div>
+      <div class="ac-meta-item"><span class="ac-meta-label">Industries:</span> ${ind}</div>
+    </div>
+    ${details}
+    ${brandHtml}
+    ${interpHtml}
+    ${renderHistorySection(a)}
+    ${renderSocialSection(a)}
+    ${renderMarketSection(a)}
+  </div>`;
+}
+
+function renderHistorySection(a) {
+  const h = a.history;
+  if (!h || !h.has_history) return '';
+  let rows = [];
+  if (h.first_seen) rows.push(`<span class="enrich-label">First archived:</span> <span>${esc(h.first_seen)}</span>`);
+  if (h.last_seen) rows.push(`<span class="enrich-label">Last archived:</span> <span>${esc(h.last_seen)}</span>`);
+  rows.push(`<span class="enrich-label">Snapshots:</span> <span>${h.total_snapshots}</span>`);
+  if (h.years_active) rows.push(`<span class="enrich-label">Years active:</span> <span>${h.years_active}</span>`);
+  if (h.past_usage) rows.push(`<span class="enrich-label">Past usage:</span> <span>${esc(h.past_usage)}</span>`);
+  return `<div class="enrich-section">
+    <div class="enrich-title">&#x1F4DC; Domain History (Wayback Machine)</div>
+    <div class="enrich-grid">${rows.join('')}</div>
+  </div>`;
+}
+
+function renderSocialSection(a) {
+  const s = a.social_handles;
+  if (!s || !s.handles || !s.handles.length) return '';
+  const items = s.handles.map(h => {
+    const cls = h.status === 'taken' ? 'sh-taken' : h.status === 'available' ? 'sh-avail' : 'sh-unk';
+    const label = h.status === 'taken' ? '&#x2714;' : h.status === 'available' ? '&#x2716;' : '?';
+    const link = h.url ? `<a href="${esc(h.url)}" target="_blank" class="sh-link">${esc(h.platform)}</a>` : esc(h.platform);
+    return `<div class="sh-item ${cls}"><span class="sh-icon">${label}</span> ${link}</div>`;
+  }).join('');
+  return `<div class="enrich-section">
+    <div class="enrich-title">&#x1F4F1; Social Handle: @${esc(s.handle || '')}</div>
+    <div class="sh-summary">${esc(s.summary || '')}</div>
+    <div class="sh-grid">${items}</div>
+  </div>`;
+}
+
+function renderMarketSection(a) {
+  const m = a.market_comp;
+  if (!m || !m.comparables || !m.comparables.length) {
+    if (m && m.market_summary) {
+      return `<div class="enrich-section">
+        <div class="enrich-title">&#x1F4B0; Market Comparables</div>
+        <div class="enrich-note">${esc(m.market_summary)}</div>
+      </div>`;
+    }
+    return '';
+  }
+  const pr = m.price_range || {};
+  let summary = '';
+  if (pr.low != null) {
+    summary = `<div class="mkt-range">Range: <strong>$${Number(pr.low).toLocaleString()} — $${Number(pr.high).toLocaleString()}</strong> &nbsp; Median: <strong>$${Number(pr.median).toLocaleString()}</strong> (${pr.count} sales)</div>`;
+  }
+  const rows = m.comparables.slice(0,6).map(c => {
+    const price = c.price ? '$' + Number(c.price).toLocaleString() : '—';
+    return `<div class="mkt-row">
+      <span class="mkt-domain">${esc(c.domain)}</span>
+      <span class="mkt-price">${price}</span>
+      <span class="mkt-source">${esc(c.source)}</span>
+    </div>`;
+  }).join('');
+  return `<div class="enrich-section">
+    <div class="enrich-title">&#x1F4B0; Market Comparables</div>
+    ${summary}
+    <div class="mkt-list">${rows}</div>
+  </div>`;
+}
+
+function renderStats(s) {
+  $('stats-bar').innerHTML = `
+    <div class="stat-card"><div class="stat-val">${s.count}</div><div class="stat-label">Total Leads</div></div>
+    <div class="stat-card"><div class="stat-val green">${s.hot}</div><div class="stat-label">Hot (70+)</div></div>
+    <div class="stat-card"><div class="stat-val yellow">${s.warm}</div><div class="stat-label">Warm (50-69)</div></div>
+    <div class="stat-card"><div class="stat-val">${s.cold || 0}</div><div class="stat-label">Other</div></div>
+    <div class="stat-card"><div class="stat-val accent">${s.emails}</div><div class="stat-label">With Email</div></div>
+    <div class="stat-card"><div class="stat-val accent">${s.phones}</div><div class="stat-label">With Phone</div></div>
+  `;
+}
+
+function renderLeads(filteredLeads) {
+  const grid = $('leads-grid');
+  grid.innerHTML = '';
+  const leads = filteredLeads || S.leads;
+  $('result-count').textContent = leads.length + ' of ' + S.leads.length + ' leads';
+
+  if (!leads.length) {
+    const isFiltered = filteredLeads && S.leads.length > 0;
+    grid.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">${isFiltered ? '&#128269;' : '&#128578;'}</div>
+      <h3>${isFiltered ? 'No leads match your filters' : 'No buyers found'}</h3>
+      <p style="color:var(--text-2);margin-bottom:16px">${isFiltered
+        ? 'Try adjusting your search or filter criteria.'
+        : 'The search did not find potential buyers for this domain. Try a domain with stronger keyword relevance.'}</p>
+      ${isFiltered ? '<button class="btn-sm accent" onclick="clearFilters()">Clear Filters</button>' : ''}
+    </div>`;
+    return;
+  }
+
+  leads.forEach((l, i) => {
+    const globalIdx = S.leads.indexOf(l);
+    const score = l.relevance_score || 0;
+    const sClass = scoreClass(score);
+    const sColor = scoreColor(score);
+    const desc = esc(l.description || l.snippet || '');
+    const emails = (l.emails || []);
+    const phone = l.phone || '';
+    const buyerType = l.buyer_type || 'general';
+    const buyerLabel = buyerType.replace(/_/g, ' ');
+
+    let tags = '';
+    tags += `<span class="buyer-badge ${buyerType}">${esc(buyerLabel)}</span>`;
+    if (emails.length) tags += `<span class="lc-tag email-tag">&#9993; ${esc(emails[0])}</span>`;
+    if (phone) tags += `<span class="lc-tag phone-tag">&#9742; ${esc(phone)}</span>`;
+    const techs = (l.technologies || []).slice(0,2);
+    techs.forEach(t => { tags += `<span class="lc-tag tech-tag">${esc(t)}</span>`; });
+
+    const reasons = (l.relevance_reasons || []);
+    const why = reasons.length ? esc(reasons[0]) : '';
+
+    const card = document.createElement('div');
+    card.className = 'lead-card';
+    card.style.animationDelay = (i * 0.04) + 's';
+    card.innerHTML = `
+      <div class="lc-top">
+        <div>
+          <div class="lc-rank">#${globalIdx+1}</div>
+          <div class="lc-name">${esc(l.name || 'Unknown')}</div>
+          <div class="lc-site">${esc(l.website_domain || '')}</div>
+        </div>
+        <div class="score-badge ${sClass}">${score}</div>
+      </div>
+      <div class="lc-bar"><div class="lc-bar-fill" style="width:${score}%;background:${sColor}"></div></div>
+      ${desc ? `<div class="lc-desc">${desc}</div>` : ''}
+      <div class="lc-contact">${tags}</div>
+      ${why ? `<div style="font-size:.8rem;color:var(--text-2);margin-bottom:10px">→ ${why}</div>` : ''}
+      <div class="lc-actions">
+        <button class="lc-btn primary" onclick="event.stopPropagation();showDetail(${globalIdx})">View Details</button>
+        <button class="lc-btn" onclick="event.stopPropagation();showEmail(${globalIdx})">Email</button>
+      </div>
+    `;
+    card.onclick = () => showDetail(globalIdx);
+    grid.appendChild(card);
+  });
+}
+
+/* ── Filtering & Sorting ───────────────────────────────────── */
+function applyFilters() {
+  let leads = [...S.leads];
+
+  // Text search
+  const q = ($('filter-search').value || '').toLowerCase().trim();
+  if (q) {
+    leads = leads.filter(l => {
+      const searchable = [l.name, l.website_domain, l.description, l.snippet,
+        ...(l.emails || []), l.phone, ...(l.relevance_reasons || []),
+        l.buyer_type, l.location].filter(Boolean).join(' ').toLowerCase();
+      return searchable.includes(q);
+    });
+  }
+
+  // Score filter
+  const sf = $('filter-score').value;
+  if (sf === 'hot') leads = leads.filter(l => (l.relevance_score||0) >= 70);
+  else if (sf === 'warm') leads = leads.filter(l => { const s = l.relevance_score||0; return s >= 50 && s < 70; });
+  else if (sf === 'cool') leads = leads.filter(l => { const s = l.relevance_score||0; return s >= 30 && s < 50; });
+  else if (sf === 'cold') leads = leads.filter(l => (l.relevance_score||0) < 30);
+
+  // Contact filter
+  const cf = $('filter-contact').value;
+  if (cf === 'email') leads = leads.filter(l => (l.emails||[]).length > 0);
+  else if (cf === 'phone') leads = leads.filter(l => !!l.phone);
+  else if (cf === 'any') leads = leads.filter(l => (l.emails||[]).length > 0 || !!l.phone);
+
+  // Sort
+  const sb = $('sort-by').value;
+  if (sb === 'score') leads.sort((a,b) => (b.relevance_score||0) - (a.relevance_score||0));
+  else if (sb === 'score-asc') leads.sort((a,b) => (a.relevance_score||0) - (b.relevance_score||0));
+  else if (sb === 'name') leads.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+  else if (sb === 'name-desc') leads.sort((a,b) => (b.name||'').localeCompare(a.name||''));
+
+  renderLeads(leads);
+}
+
+function clearFilters() {
+  $('filter-search').value = '';
+  $('filter-score').value = 'all';
+  $('filter-contact').value = 'all';
+  $('sort-by').value = 'score';
+  renderLeads();
+}
+
+/* ── Detail panel ──────────────────────────────────────────── */
+function showDetail(idx) {
+  const l = S.leads[idx];
+  if (!l) return;
+  const score = l.relevance_score || 0;
+  const sClass = scoreClass(score);
+  const buyerType = l.buyer_type || 'general';
+  const buyerLabel = buyerType.replace(/_/g, ' ');
+
+  let html = `<div class="dp-score-row">
+    <div class="dp-score-big ${sClass}" style="border-color:${scoreColor(score)};color:${scoreColor(score)}">${score}</div>
+    <div>
+      <div class="dp-name">${esc(l.name || 'Unknown')}</div>
+      <a class="dp-website" href="${esc(l.website || '')}" target="_blank" rel="noopener">${esc(l.website_domain || l.website || '')}</a>
+      <div style="margin-top:6px"><span class="buyer-badge ${buyerType}">${esc(buyerLabel)}</span></div>
+    </div>
+  </div>`;
+
+  // Score breakdown
+  const bd = l.score_breakdown;
+  if (bd) {
+    const cats = [
+      {key:'brand_fit', label:'Brand Fit', max:30, color:'var(--accent)'},
+      {key:'content_match', label:'Content', max:20, color:'var(--purple)'},
+      {key:'domain_gap', label:'Domain Gap', max:18, color:'var(--green)'},
+      {key:'discovery_depth', label:'Discovery', max:12, color:'var(--yellow)'},
+      {key:'actionability', label:'Actionable', max:12, color:'var(--orange)'},
+      {key:'buyer_signals', label:'Buyer Signal', max:8, color:'#ec4899'},
+    ];
+    html += `<div class="dp-section"><div class="dp-label">Score Breakdown</div><div class="breakdown-bars">`;
+    cats.forEach(c => {
+      const v = bd[c.key] || 0;
+      const pct = Math.round(v / c.max * 100);
+      html += `<div class="bd-row"><span class="bd-label">${c.label}</span>
+        <div class="bd-track"><div class="bd-fill" style="width:${pct}%;background:${c.color}"></div></div>
+        <span class="bd-val">${v}</span></div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  if (l.description || l.snippet) {
+    html += `<div class="dp-section"><div class="dp-label">About</div><div class="dp-text">${esc(l.description || l.snippet)}</div></div>`;
+  }
+
+  const emails = l.emails || [];
+  const phone = l.phone || '';
+  if (emails.length || phone) {
+    html += `<div class="dp-section"><div class="dp-label">Contact</div><div class="dp-text">`;
+    emails.forEach(e => { html += `<div>&#9993; <a href="mailto:${esc(e)}">${esc(e)}</a></div>`; });
+    if (phone) html += `<div>&#9742; ${esc(phone)}</div>`;
+    html += `</div></div>`;
+  }
+
+  if (l.location) html += `<div class="dp-section"><div class="dp-label">Location</div><div class="dp-text">${esc(l.location)}</div></div>`;
+
+  const social = l.social || {};
+  if (Object.keys(social).length) {
+    html += `<div class="dp-section"><div class="dp-label">Social</div><div class="dp-tags">`;
+    for (const [k,v] of Object.entries(social)) {
+      html += `<a class="dp-tag" href="${esc(v)}" target="_blank" rel="noopener">${esc(k)}</a>`;
+    }
+    html += `</div></div>`;
+  }
+
+  const techs = l.technologies || [];
+  if (techs.length) {
+    html += `<div class="dp-section"><div class="dp-label">Technology</div><div class="dp-tags">`;
+    techs.forEach(t => { html += `<span class="dp-tag">${esc(t)}</span>`; });
+    html += `</div></div>`;
+  }
+
+  const reasons = l.relevance_reasons || [];
+  if (reasons.length) {
+    html += `<div class="dp-section"><div class="dp-label">Why This Lead</div><ul class="dp-list">`;
+    reasons.forEach(r => { html += `<li>${esc(r)}</li>`; });
+    html += `</ul></div>`;
+  }
+
+  html += `<div class="dp-actions">
+    <button class="btn-sm accent" onclick="showEmail(${idx})">Generate Email</button>
+    <a class="btn-sm" href="${esc(l.website || '')}" target="_blank" rel="noopener">Visit Website</a>
+  </div>`;
+
+  $('dp-content').innerHTML = html;
+  $('detail-panel').classList.add('open');
+  $('panel-overlay').classList.add('open');
+}
+
+function closeDetail() {
+  $('detail-panel').classList.remove('open');
+  $('panel-overlay').classList.remove('open');
+}
+
+/* ── Email modal ───────────────────────────────────────────── */
+async function showEmail(idx) {
+  closeDetail();
+  const lead = S.leads[idx];
+  if (!lead) return;
+
+  $('email-title').textContent = 'Email — ' + (lead.name || 'Lead');
+  $('email-tabs').innerHTML = '<div style="color:var(--text-2);font-size:.85rem">Loading templates...</div>';
+  $('email-subject').textContent = '';
+  $('email-body').textContent = '';
+  $('email-overlay').classList.add('open');
+
+  try {
+    const res = await fetch(`/api/all-emails/${S.tid}/${idx}`);
+    S.emailData = await res.json();
+    const types = Object.keys(S.emailData);
+
+    $('email-tabs').innerHTML = '';
+    types.forEach((t, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'tab' + (i === 0 ? ' active' : '');
+      btn.textContent = t.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      btn.onclick = () => selectEmailTab(t, btn);
+      $('email-tabs').appendChild(btn);
+    });
+    if (types.length) selectEmailTab(types[0]);
+  } catch(e) {
+    $('email-subject').textContent = 'Error loading email templates';
+  }
+}
+
+function selectEmailTab(type, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  else document.querySelector(`.tab`)?.classList.add('active');
+  const d = S.emailData[type];
+  if (d) {
+    $('email-subject').textContent = 'Subject: ' + (d.subject || '');
+    $('email-body').textContent = d.body || '';
+  }
+}
+
+function copyEmail() {
+  const subj = $('email-subject').textContent.replace(/^Subject:\s*/, '');
+  const body = $('email-body').textContent;
+  navigator.clipboard.writeText(`Subject: ${subj}\n\n${body}`).then(() => {
+    toast('Copied to clipboard!', 'success');
+  });
+}
+
+function closeEmail() {
+  $('email-overlay').classList.remove('open');
+}
+
+/* ── Export ─────────────────────────────────────────────────── */
+function exportAs(fmt) {
+  if (!S.tid) return;
+  const a = document.createElement('a');
+  a.href = `/api/export/${S.tid}/${fmt}`;
+  a.download = '';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  toast(`${fmt.toUpperCase()} export downloaded`, 'success');
+}
+
+/* ── Error ─────────────────────────────────────────────────── */
+function showError(msg) {
+  hide($('s-processing'));
+  show($('s-results'));
+  $('analysis-card').innerHTML = '';
+  $('stats-bar').innerHTML = '';
+  $('leads-grid').innerHTML = `<div class="error-card">
+    <h2>Something went wrong</h2>
+    <p style="color:var(--text-2);margin-bottom:20px">${esc(msg)}</p>
+    <button class="btn-sm accent" onclick="resetLanding()">Try Again</button>
+  </div>`;
+  show($('btn-new'));
+}
+
+/* ── Reset ─────────────────────────────────────────────────── */
+function resetLanding() {
+  hide($('s-processing'));
+  hide($('s-results'));
+  show($('s-landing'));
+  hide($('btn-new'));
+  $('btn-go').disabled = false;
+  $('inp-domain').value = '';
+  $('inp-domain').focus();
+  S = { tid: null, leads: [], analysis: null, emailData: null };
+}
+
+/* ── Keyboard shortcuts ────────────────────────────────────── */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeDetail();
+    closeEmail();
+  }
+});
+</script>
+</body>
+</html>

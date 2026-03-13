@@ -1,0 +1,43 @@
+# Domain Seller Configuration
+# Copy this file to config.yaml and fill in your API keys
+
+# Search engine configuration
+search:
+  # Engine: "auto" (tries ddgs then google), "ddgs", "google", or "serpapi" (needs API key)
+  engine: "auto"
+  # SerpAPI key (get one at https://serpapi.com - 100 free searches/month)
+  serpapi_key: ""
+  # Maximum results per search query
+  max_results_per_query: 10
+  # Delay between searches in seconds (to avoid rate limiting)
+  delay_between_searches: 2
+
+# Company enrichment settings
+enrichment:
+  # Whether to visit company websites and scrape info
+  scrape_websites: true
+  # Timeout for HTTP requests in seconds
+  request_timeout: 10
+  # Maximum companies to enrich (deep scraping)
+  max_enrich: 20
+
+# Lead generation settings
+leads:
+  # Maximum leads to return
+  max_leads: 20
+  # Minimum relevance score (0-100) to include a lead
+  min_score: 20
+
+# Output settings
+output:
+  # Show detailed analysis in console
+  verbose: false
+  # Auto-export results (set to "" to disable, e.g., "leads.csv")
+  auto_export: ""
+
+# Cache settings
+cache:
+  # Enable file-based caching of search results
+  enabled: true
+  # Cache expiration in hours
+  ttl_hours: 24
