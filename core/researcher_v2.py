@@ -715,7 +715,7 @@ class BuyerResearcher:
         resp = self._safe_get(company["website"], timeout=timeout)
         if resp is not None:
             html_text = resp.text
-            soup = BeautifulSoup(html_text, "lxml")
+            soup = BeautifulSoup(html_text, "html.parser")
 
             # --- Title ---
             if soup.title and soup.title.string:
@@ -777,7 +777,7 @@ class BuyerResearcher:
             # --- /about page ---
             about_resp = self._safe_get(f"https://{domain_key}/about", timeout=5)
             if about_resp and len(about_resp.text) > 500:
-                about_soup = BeautifulSoup(about_resp.text, "lxml")
+                about_soup = BeautifulSoup(about_resp.text, "html.parser")
                 about_meta = about_soup.find("meta", attrs={"name": "description"})
                 if about_meta and about_meta.get("content"):
                     about_desc = about_meta["content"].strip()[:500]
@@ -960,7 +960,7 @@ class BuyerResearcher:
 
         try:
             resp = self._session.get(f"https://{alt_domain}", timeout=5, allow_redirects=True)
-            soup = BeautifulSoup(resp.text, "lxml")
+            soup = BeautifulSoup(resp.text, "html.parser")
             if soup.title and soup.title.string:
                 result["title"] = soup.title.string.strip()[:200]
                 result["meta_title"] = result["title"]
@@ -1050,7 +1050,7 @@ class BuyerResearcher:
 
         resp = self._safe_get(f"https://{var_domain}", timeout=5)
         if resp is not None:
-            soup = BeautifulSoup(resp.text, "lxml")
+            soup = BeautifulSoup(resp.text, "html.parser")
             if soup.title and soup.title.string:
                 result["title"] = soup.title.string.strip()[:200]
                 result["meta_title"] = result["title"]

@@ -27,16 +27,32 @@ except ImportError:
     print("\n  Flask is required for the GUI. Install it:\n    pip install flask\n")
     sys.exit(1)
 
-from core.config import Config
-from core.analyzer import DomainAnalyzer
-from core.researcher_v2 import BuyerResearcher
-from core.lead_scorer import LeadScorer
-from core.outreach import generate_outreach_email, generate_all_templates
-from core.html_report import generate_html_report
-from core.history import check_domain_history
-from core.social_checker import check_social_handles
-from core.market_comp import find_comparable_sales
-from core.validators import validate_domain, ValidationError
+# Lazy imports — heavy core modules are loaded on first use so the index page
+# can render without pulling in every dependency (important for serverless).
+_core_loaded = False
+
+
+def _ensure_core():
+    global _core_loaded
+    if _core_loaded:
+        return
+    global Config, DomainAnalyzer, BuyerResearcher, LeadScorer
+    global generate_outreach_email, generate_all_templates
+    global generate_html_report, check_domain_history
+    global check_social_handles, find_comparable_sales
+    global validate_domain, ValidationError
+
+    from core.config import Config
+    from core.analyzer import DomainAnalyzer
+    from core.researcher_v2 import BuyerResearcher
+    from core.lead_scorer import LeadScorer
+    from core.outreach import generate_outreach_email, generate_all_templates
+    from core.html_report import generate_html_report
+    from core.history import check_domain_history
+    from core.social_checker import check_social_handles
+    from core.market_comp import find_comparable_sales
+    from core.validators import validate_domain, ValidationError
+    _core_loaded = True
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(32).hex())
@@ -85,6 +101,7 @@ def index():
 
 @app.route("/api/start", methods=["POST"])
 def api_start():
+    _ensure_core()
     raw_domain = (request.json or {}).get("domain", "").strip()
     if not raw_domain:
         return jsonify(error="No domain provided"), 400
@@ -147,6 +164,7 @@ def api_results(tid):
 
 @app.route("/api/email/<tid>/<int:idx>")
 def api_email(tid, idx):
+    _ensure_core()
     t = tasks.get(tid)
     if not t or "leads" not in t["results"]:
         return jsonify(error="Not found"), 404
@@ -158,6 +176,7 @@ def api_email(tid, idx):
 
 @app.route("/api/all-emails/<tid>/<int:idx>")
 def api_all_emails(tid, idx):
+    _ensure_core()
     t = tasks.get(tid)
     if not t or "leads" not in t["results"]:
         return jsonify(error="Not found"), 404
@@ -169,6 +188,7 @@ def api_all_emails(tid, idx):
 
 @app.route("/api/export/<tid>/<fmt>")
 def api_export(tid, fmt):
+    _ensure_core()
     if fmt not in ("html", "json", "csv"):
         return jsonify(error="Invalid format. Use: html, json, csv"), 400
     t = tasks.get(tid)

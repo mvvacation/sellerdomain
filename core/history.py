@@ -89,7 +89,7 @@ def _classify_last_snapshot(domain):
             return ""
 
         text = resp.text[:30000]  # limit parsing size
-        soup = BeautifulSoup(text, "lxml")
+        soup = BeautifulSoup(text, "html.parser")
 
         title = ""
         if soup.title and soup.title.string:
