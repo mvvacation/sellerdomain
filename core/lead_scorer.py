@@ -1,4 +1,9 @@
-"""Lead scoring module v3 — deep, multi-signal relevance scoring."""
+"""Lead scoring module v4 — relevance-first scoring.
+
+Relevance is king. A lead's score is dominated by how closely their brand,
+content, and industry match the domain being sold. Secondary signals
+(funding, contact info, tech stack) are tie-breakers, not score inflators.
+"""
 
 import re
 from difflib import SequenceMatcher
@@ -59,15 +64,20 @@ _TEAM_SIZE_RE = re.compile(r"(\d{1,5})\+?\s*(?:employees?|team members?|people|s
 
 
 class LeadScorer:
-    """Multi-signal relevance scorer with weighted categories."""
+    """Relevance-first scorer. Irrelevant leads get crushed, relevant ones shine.
 
-    # Weight allocation (total 100):
-    #   Brand fit      : 28  (domain name / keyword alignment)
-    #   Content match  : 18  (description and snippet relevance)
-    #   Domain gap     : 18  (their domain is worse → upgrade signal)
-    #   Discovery depth: 10  (appeared in many queries)
-    #   Actionability  : 12  (contact info present)
-    #   Buyer signals  : 14  (funded, growing, rebranding intent)
+    Weight allocation (total 100):
+      Brand fit      : 40  (domain name / keyword alignment — THE key signal)
+      Content match  : 25  (description, snippet, industry relevance)
+      Domain gap     : 12  (their domain is worse → upgrade motivation)
+      Discovery depth:  8  (appeared in many queries → cross-validated)
+      Buyer signals  : 10  (funded, growing, rebranding intent)
+      Actionability  :  5  (contact info — useful but not a relevance signal)
+
+    PENALTY: leads with zero brand_fit AND zero content_match get -15.
+    This ensures random companies that just happen to be funded or have
+    contact info don't pollute the results.
+    """
 
     def __init__(self, analysis):
         self.analysis = analysis
@@ -96,41 +106,71 @@ class LeadScorer:
     # ── Score breakdown ───────────────────────────────────────────
 
     def _score_breakdown(self, lead):
+        brand = self._brand_fit(lead)
+        content = self._content_match(lead)
+        gap = self._domain_gap(lead)
+        depth = self._discovery_depth(lead)
+        signals = self._buyer_signals(lead)
+        action = self._actionability(lead)
+
+        # PENALTY: if the lead has NO brand fit AND NO content match,
+        # it's almost certainly irrelevant noise. Penalize heavily.
+        penalty = 0
+        if brand == 0 and content == 0:
+            penalty = -15
+
         return {
-            "brand_fit": self._brand_fit(lead),
-            "content_match": self._content_match(lead),
-            "domain_gap": self._domain_gap(lead),
-            "discovery_depth": self._discovery_depth(lead),
-            "actionability": self._actionability(lead),
-            "buyer_signals": self._buyer_signals(lead),
+            "brand_fit": brand,
+            "content_match": content,
+            "domain_gap": gap,
+            "discovery_depth": depth,
+            "buyer_signals": signals,
+            "actionability": action,
+            "relevance_penalty": penalty,
         }
 
     def _brand_fit(self, lead):
-        """How well the lead's brand aligns with our domain. Max 28."""
+        """How well the lead's brand aligns with our domain. Max 40."""
         pts = 0
         ext = tldextract.extract(lead.get("website_domain", ""))
         cdomain = ext.domain.lower()
         name_lower = lead.get("name", "").lower()
 
-        # Exact domain name match
+        # Exact domain name match — perfect fit
         if self.domain_name == cdomain:
-            pts += 20
+            pts += 30
         elif self.domain_name in cdomain or cdomain in self.domain_name:
-            ratio = SequenceMatcher(None, self.domain_name, cdomain).ratio()
-            pts += int(ratio * 16)
+            # Substring match: "seller" in "sellerdomain" or vice versa
+            overlap = min(len(self.domain_name), len(cdomain))
+            longer = max(len(self.domain_name), len(cdomain))
+            ratio = overlap / longer if longer > 0 else 0
+            pts += int(ratio * 24)
         else:
             ratio = SequenceMatcher(None, self.domain_name, cdomain).ratio()
-            if ratio >= 0.65:
-                pts += int(ratio * 12)
+            if ratio >= 0.75:
+                pts += int(ratio * 18)
+            elif ratio >= 0.6:
+                pts += int(ratio * 10)
+            # Below 0.6 similarity → no brand fit points
 
-        # Keyword presence in company name
+        # Keyword presence in company name — strong relevance signal
         matched_kws = sum(1 for kw in self.keywords if kw in name_lower and len(kw) >= 3)
-        pts += min(8, matched_kws * 4)
+        if matched_kws >= 3:
+            pts += 12
+        elif matched_kws >= 2:
+            pts += 8
+        elif matched_kws >= 1:
+            pts += 5
 
-        return min(28, pts)
+        # Keyword presence in their domain name
+        domain_kw_hits = sum(1 for kw in self.keywords if kw in cdomain and len(kw) >= 3)
+        if domain_kw_hits >= 1:
+            pts += 4
+
+        return min(40, pts)
 
     def _content_match(self, lead):
-        """How relevant the lead's content is to our domain. Max 18."""
+        """How relevant the lead's content is to our domain. Max 25."""
         pts = 0
         text = " ".join(
             [
@@ -143,7 +183,7 @@ class LeadScorer:
         if not text.strip():
             return 0
 
-        # Each keyword found in content (diminishing returns)
+        # Keyword density in content
         kw_hits = 0
         for kw in self.keywords:
             if len(kw) < 3:
@@ -151,30 +191,31 @@ class LeadScorer:
             if kw in text:
                 kw_hits += 1
         if kw_hits >= len(self.keywords) and len(self.keywords) >= 2:
-            pts += 10  # all keywords present — strong match
+            pts += 14  # all keywords present — very strong match
         elif kw_hits >= 2:
-            pts += 7
+            pts += 9
         elif kw_hits >= 1:
-            pts += 4
+            pts += 5
 
         # Industry match in content
-        for ind in self.industries:
-            if ind in text:
-                pts += 3
-                break
+        ind_hits = sum(1 for ind in self.industries if ind in text)
+        if ind_hits >= 2:
+            pts += 6
+        elif ind_hits >= 1:
+            pts += 4
 
         # Geographic match — lead is in a detected geo target
         loc_clean = text.replace("'", "").replace("\u2019", "")
         for geo in self.geo_targets:
             geo_clean = geo.lower().replace("'", "").replace("\u2019", "")
             if geo_clean in loc_clean:
-                pts += 4
+                pts += 5
                 break
 
-        return min(18, pts)
+        return min(25, pts)
 
     def _domain_gap(self, lead):
-        """How much worse their current domain is vs ours. Max 18."""
+        """How much worse their current domain is vs ours. Max 12."""
         pts = 0
         ext = tldextract.extract(lead.get("website_domain", ""))
         cdomain = ext.domain.lower()
@@ -184,66 +225,64 @@ class LeadScorer:
 
         # Similar domain flag — strongest gap signal
         if lead.get("is_similar_domain"):
-            pts += 10
+            pts += 7
 
         # TLD upgrade opportunity
         if our_tld_tier > their_tld_tier:
-            pts += min(6, (our_tld_tier - their_tld_tier) * 2)
+            pts += min(4, (our_tld_tier - their_tld_tier) * 2)
 
         # Length penalty — they have a longer domain
         len_diff = len(cdomain) - len(self.domain_name)
-        if len_diff > 0:
-            pts += min(5, len_diff)
+        if len_diff > 2:
+            pts += min(3, len_diff - 1)
 
         # Hyphenated domain — they might want a clean one
         if "-" in cdomain:
-            pts += 3
+            pts += 2
 
         # Their domain has numbers
         if re.search(r"\d", cdomain):
-            pts += 2
+            pts += 1
 
         # Both are short .com → small upgrade gap
         if len(cdomain) <= 4 and ctld == "com" and self.tld == "com" and not lead.get("is_similar_domain"):
             pts -= 2
 
-        return max(0, min(18, pts))
+        return max(0, min(12, pts))
 
     def _discovery_depth(self, lead):
-        """How many different queries surfaced this lead. Max 10."""
+        """How many different queries surfaced this lead. Max 8."""
         n = len(lead.get("matched_queries", []))
-        if n >= 6:
-            return 10
-        if n >= 4:
+        if n >= 5:
             return 8
-        if n >= 3:
+        if n >= 4:
             return 6
+        if n >= 3:
+            return 5
         if n >= 2:
-            return 4
-        return 1
+            return 3
+        return 0  # single query hit = no depth bonus
 
     def _actionability(self, lead):
-        """How easy it is to contact them. Max 12."""
+        """How easy it is to contact them. Max 5. (Tie-breaker only.)"""
         pts = 0
         if lead.get("emails"):
-            pts += 4
+            pts += 2
             # Extra for a matching-domain email (not generic gmail)
             for e in lead["emails"]:
                 edomain = e.split("@")[-1].lower()
                 if edomain == lead.get("website_domain", "").lower():
-                    pts += 2
+                    pts += 1
                     break
         if lead.get("phone"):
-            pts += 3
+            pts += 1
         social = lead.get("social", {})
         if social.get("linkedin"):
-            pts += 2
-        if social.get("twitter") or social.get("facebook"):
             pts += 1
-        return min(12, pts)
+        return min(5, pts)
 
     def _buyer_signals(self, lead):
-        """Indirect buying-intent signals. Max 14."""
+        """Indirect buying-intent signals. Max 10."""
         pts = 0
         text = " ".join(
             [
@@ -253,40 +292,26 @@ class LeadScorer:
             ]
         ).lower()
 
-        # Funded startup → has money to spend
-        if _FUNDING_SIGNALS.search(text):
-            pts += 4
-
         # Rebrand / domain acquisition intent — strongest signal
         if _REBRAND_SIGNALS.search(text):
-            pts += 5
+            pts += 4
+
+        # Funded startup → has money to spend
+        if _FUNDING_SIGNALS.search(text):
+            pts += 3
 
         # Active growth → brand investment phase
         if _GROWTH_SIGNALS.search(text):
             pts += 2
 
-        # Team growing → brand investment phase
+        # Team size
         m = _TEAM_SIZE_RE.search(text)
         if m:
             size = int(m.group(1))
             if 10 <= size <= 500:
-                pts += 2  # mid-size = sweet spot for domain buying
-            elif size > 500:
-                pts += 1  # large companies still buy but less urgently
+                pts += 1  # mid-size = sweet spot
 
-        # Technology investment signals — modern stack = higher budget
-        techs = {t.lower() for t in lead.get("technologies", [])}
-        modern = {"react", "vue.js", "next.js", "angular", "graphql", "kubernetes", "webflow"}
-        if techs & modern:
-            pts += 3
-        elif len(techs) >= 3:
-            pts += 1
-
-        # Location present (established company)
-        if lead.get("location"):
-            pts += 1
-
-        return min(14, pts)
+        return min(10, pts)
 
     # ── Buyer classification ──────────────────────────────────────
 
@@ -299,15 +324,15 @@ class LeadScorer:
             return "similar_domain"
         if self.domain_name == cdomain:
             return "exact_match"
-        if breakdown["brand_fit"] >= 18 and breakdown["domain_gap"] >= 10:
+        if breakdown["brand_fit"] >= 25 and breakdown["domain_gap"] >= 6:
             return "strong_upgrade"
-        if breakdown["buyer_signals"] >= 9:
+        if breakdown["buyer_signals"] >= 7:
             return "rebrand_candidate"
-        if breakdown["buyer_signals"] >= 5:
-            return "funded_startup"
-        if breakdown["brand_fit"] >= 12 and score >= 55:
+        if breakdown["brand_fit"] >= 20 and score >= 60:
             return "brand_match"
-        if score >= 60:
+        if breakdown["buyer_signals"] >= 4 and breakdown["brand_fit"] >= 10:
+            return "funded_startup"
+        if score >= 55:
             return "high_relevance"
         if score >= 40:
             return "moderate_relevance"
@@ -363,12 +388,13 @@ class LeadScorer:
             reasons.append(f"Established team (~{m.group(1)} employees)")
 
         # Content relevance
-        if breakdown.get("content_match", 0) >= 10:
-            reasons.append("Strong keyword overlap in their content")
+        if breakdown.get("content_match", 0) >= 12:
+            reasons.append("Strong keyword and industry overlap in their content")
+        elif breakdown.get("content_match", 0) >= 7:
+            reasons.append("Good keyword overlap in their content")
 
         # Geo-match reasons
         loc = (lead.get("location", "") + " " + text).lower()
-        # Strip apostrophes for flexible matching (Martha's vs Marthas, etc.)
         loc_clean = loc.replace("'", "").replace("\u2019", "")
         for geo in self.geo_targets:
             geo_clean = geo.replace("'", "").replace("\u2019", "")

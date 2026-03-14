@@ -615,8 +615,10 @@ class BuyerResearcher:
         ]
 
     def _extract_companies(self, raw_results):
-        """Extract company information from search results."""
+        """Extract company information from search results with relevance pre-filter."""
         companies = {}
+        name_lower = self.analysis["name"].lower()
+        keywords_lower = {k.lower() for k in self.keywords if len(k) >= 3}
 
         for result in raw_results:
             url = result.get("url", "")
@@ -666,7 +668,35 @@ class BuyerResearcher:
                 if result.get("snippet") and not companies[domain]["snippet"]:
                     companies[domain]["snippet"] = result["snippet"]
 
-        return list(companies.values())
+        # --- RELEVANCE PRE-FILTER ---
+        # Drop companies that have zero textual connection to the domain.
+        # This prevents noise from polluting the results before scoring.
+        filtered = []
+        for company in companies.values():
+            cdomain = tldextract.extract(company["website_domain"]).domain.lower()
+            text = " ".join([
+                company.get("name", ""),
+                company.get("title", ""),
+                company.get("snippet", ""),
+            ]).lower()
+
+            # Keep if: domain name overlaps, or any keyword appears in text,
+            # or company appeared in 2+ queries (cross-validated).
+            has_name_overlap = (
+                name_lower in cdomain
+                or cdomain in name_lower
+                or any(kw in cdomain for kw in keywords_lower)
+            )
+            has_keyword_in_text = any(kw in text for kw in keywords_lower)
+            has_industry_match = any(ind.lower() in text for ind in self.industries)
+            multi_query = len(company.get("matched_queries", [])) >= 2
+
+            if has_name_overlap or has_keyword_in_text or has_industry_match or multi_query:
+                filtered.append(company)
+
+        logger.info("Pre-filter: %d → %d companies (dropped %d irrelevant)",
+                     len(companies), len(filtered), len(companies) - len(filtered))
+        return filtered
 
     def _enrich_companies(self, companies):
         """Enrich company data by visiting their websites — concurrent with retry."""

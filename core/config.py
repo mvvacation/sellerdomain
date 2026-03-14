@@ -20,7 +20,7 @@ DEFAULT_CONFIG = {
     },
     "leads": {
         "max_leads": 20,
-        "min_score": 20,
+        "min_score": 35,
     },
     "output": {
         "verbose": False,

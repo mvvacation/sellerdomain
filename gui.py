@@ -310,7 +310,7 @@ def _run_pipeline(tid, domain):
 
         q.put({"type": "step", "step": "scoring", "msg": f"Scoring {len(raw)} leads..."})
         scored = LeadScorer(analysis).score_and_rank(raw)
-        scored = [l for l in scored if l.get("relevance_score", 0) >= 20][:30]
+        scored = [l for l in scored if l.get("relevance_score", 0) >= 35][:25]
         res["leads"] = _jsonable(scored)
 
         q.put({
