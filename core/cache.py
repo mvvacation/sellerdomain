@@ -10,7 +10,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-CACHE_DIR = Path(".domainseller_cache")
+CACHE_DIR = Path(os.environ.get("CACHE_DIR", ".domainseller_cache"))
 
 
 class SearchCache:
@@ -20,7 +20,11 @@ class SearchCache:
         self.enabled = enabled
         self.ttl_hours = ttl_hours
         if enabled:
-            CACHE_DIR.mkdir(exist_ok=True)
+            try:
+                CACHE_DIR.mkdir(exist_ok=True)
+            except OSError:
+                # Read-only filesystem (e.g. Vercel) — disable caching silently
+                self.enabled = False
 
     def _key(self, namespace, query):
         raw = f"{namespace}:{query}"
