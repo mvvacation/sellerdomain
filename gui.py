@@ -329,4 +329,5 @@ if __name__ == "__main__":
         target=lambda: (__import__("time").sleep(1.5), webbrowser.open(url)),
         daemon=True,
     ).start()
-    app.run(host="127.0.0.1", port=port, debug=False, threaded=True)
+    host = os.environ.get("HOST", "127.0.0.1")
+    app.run(host=host, port=port, debug=False, threaded=True)
