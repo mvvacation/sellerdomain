@@ -31,6 +31,7 @@ Thumbs.db
 # Output files
 *.csv
 *.json
+!vercel.json
 !config.yaml.example
 !requirements.txt
 reports/
